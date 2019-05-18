@@ -1625,9 +1625,9 @@ class AutoTest(ABC):
         raise WaitWaypointTimeout("Timed out waiting for waypoint %u of %u" %
                                   (wpnum_end, wpnum_end))
 
-    def mode_is(self, mode, cached=False):
+    def mode_is(self, mode, cached=False, drain_mav=True):
         if not cached:
-            self.wait_heartbeat()
+            self.wait_heartbeat(drain_mav=drain_mav)
         try:
             return self.get_mode_from_mode_mapping(self.mav.flightmode) == self.get_mode_from_mode_mapping(mode)
         except Exception as e:
@@ -1639,7 +1639,7 @@ class AutoTest(ABC):
         """Wait for mode to change."""
         self.progress("Waiting for mode %s" % mode)
         tstart = self.get_sim_time()
-        while not self.mode_is(mode):
+        while not self.mode_is(mode, drain_mav=False):
             custom_num = self.mav.messages['HEARTBEAT'].custom_mode
             self.progress("mav.flightmode=%s Want=%s custom=%u" % (
                     self.mav.flightmode, mode, custom_num))
@@ -1676,9 +1676,10 @@ class AutoTest(ABC):
         if require_absolute:
             self.wait_gps_sys_status_not_present_or_enabled_and_healthy()
 
-    def wait_heartbeat(self, *args, **x):
+    def wait_heartbeat(self, drain_mav=True, *args, **x):
         '''as opposed to mav.wait_heartbeat, raises an exception on timeout'''
-        self.drain_mav()
+        if drain_mav:
+            self.drain_mav()
         m = self.mav.wait_heartbeat(*args, **x)
         if m is None:
             raise AutoTestTimeoutException("Did not receive heartbeat")
@@ -1782,7 +1783,18 @@ class AutoTest(ABC):
             self.progress(fmt % (desc, time))
 
     def send_statustext(self, text):
-        self.mav.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_WARNING, bytes(text))
+        if sys.version_info.major >= 3 and not isinstance(text, bytes):
+            text = bytes(text, "ascii")
+        self.mav.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_WARNING, text)
+
+    def get_exception_stacktrace(self, e):
+        if sys.version_info[0] >= 3:
+            ret = "%s\n" % e
+            ret += ''.join(traceback.format_exception(etype=type(e),
+                                                      value=e,
+                                                      tb=e.__traceback__))
+            return ret
+        return traceback.format_exc(e)
 
     def run_one_test(self, name, desc, test_function, interact=False):
         '''new-style run-one-test used by run_tests'''
@@ -1807,12 +1819,7 @@ class AutoTest(ABC):
             test_function()
         except Exception as e:
             self.test_timings[desc] = time.time() - start_time
-            try:
-                stacktrace = traceback.format_exc(e)
-            except Exception:
-                # seems to be broken under Python3:
-                stacktrace = "stacktrace unavailable"
-            self.progress("Exception caught: %s" % stacktrace)
+            self.progress("Exception caught: %s" % self.get_exception_stacktrace(e))
             self.context_pop()
             self.progress('FAILED: "%s": %s (see %s)' %
                           (prettyname, repr(e), test_output_filename))
@@ -2328,8 +2335,9 @@ class AutoTest(ABC):
                     "long SET_MESSAGE_INTERVAL %u %d\n" %
                     (mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_FEEDBACK,
                      self.rate_to_interval_us(want_rate)))
+                self.drain_mav()
                 rate = round(self.get_message_rate("CAMERA_FEEDBACK", 20))
-                self.progress("Want=%f got=%f" % (want_rate, rate))
+                self.progress("Want=%u got=%u" % (want_rate, rate))
                 if rate != want_rate:
                     raise NotAchievedException("Did not get expected rate")
 
@@ -2349,6 +2357,8 @@ class AutoTest(ABC):
             if abs(rate - want_rate) > 2:
                 raise NotAchievedException("Did not get expected rate")
 
+            self.drain_mav()
+
             self.progress("Resetting CAMERA_FEEDBACK rate to zero")
             self.set_message_rate_hz(mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_FEEDBACK, -1)
 
@@ -2366,6 +2376,8 @@ class AutoTest(ABC):
             self.mavproxy.send("set streamrate %u\n" % sr)
 
         except Exception as e:
+            self.progress("Caught exception %s" %
+                          self.get_exception_stacktrace(e))
             # tell MAVProxy to start stuffing around with the rates:
             sr = self.sitl_streamrate()
             self.mavproxy.send("set streamrate %u\n" % sr)
@@ -2625,7 +2637,7 @@ switch value'''
                      0,
                      0,
                      0,
-                     timeout=2,
+                     timeout=4,
                      want_result=mavutil.mavlink.MAV_RESULT_FAILED)
         self.context_pop()
         self.run_cmd(mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
@@ -2636,7 +2648,7 @@ switch value'''
                      0,
                      0,
                      0,
-                     timeout=2,
+                     timeout=4,
                      want_result=mavutil.mavlink.MAV_RESULT_ACCEPTED)
         self.disarm_vehicle()
 

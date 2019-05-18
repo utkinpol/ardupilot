@@ -11,11 +11,13 @@ bool ModeAuto::_enter()
         return false;
     }
 
-    // initialise waypoint speed
-    set_desired_speed_to_default();
-
     // init location target
-    set_desired_location(rover.current_loc);
+    if (!g2.wp_nav.set_desired_location(rover.current_loc)) {
+        return false;
+    }
+
+    // initialise waypoint speed
+    g2.wp_nav.set_desired_speed_to_default();
 
     // other initialisation
     auto_triggered = false;
@@ -41,18 +43,9 @@ void ModeAuto::update()
     switch (_submode) {
         case Auto_WP:
         {
-            _distance_to_destination = rover.current_loc.get_distance(_destination);
-            const bool near_wp = _distance_to_destination <= rover.g.waypoint_radius;
-            // check if we've reached the destination
-            if (!_reached_destination && (near_wp || rover.current_loc.past_interval_finish_line(_origin, _destination))) {
-                // trigger reached
-                _reached_destination = true;
-            }
-            // determine if we should keep navigating
-            if (!_reached_destination) {
-                // continue driving towards destination
-                calc_steering_to_waypoint(_reached_destination ? rover.current_loc : _origin, _destination, _reversed);
-                calc_throttle(calc_reduced_speed_for_turn_or_distance(_reversed ? -_desired_speed : _desired_speed), true, true);
+            if (!g2.wp_nav.reached_destination()) {
+                // update navigation controller
+                navigate_to_waypoint();
             } else {
                 // we have reached the destination so stay here
                 if (rover.is_boat()) {
@@ -62,6 +55,8 @@ void ModeAuto::update()
                 } else {
                     stop_vehicle();
                 }
+                // update distance to destination
+                _distance_to_destination = rover.current_loc.get_distance(g2.wp_nav.get_destination());
             }
             break;
         }
@@ -71,7 +66,7 @@ void ModeAuto::update()
             if (!_reached_heading) {
                 // run steering and throttle controllers
                 calc_steering_to_heading(_desired_yaw_cd);
-                calc_throttle(_desired_speed, true, true);
+                calc_throttle(calc_speed_nudge(_desired_speed, is_negative(_desired_speed)), true);
                 // check if we have reached within 5 degrees of target
                 _reached_heading = (fabsf(_desired_yaw_cd - ahrs.yaw_sensor) < 500);
             } else {
@@ -105,32 +100,48 @@ void ModeAuto::update()
     }
 }
 
-void ModeAuto::calc_throttle(float target_speed, bool nudge_allowed, bool avoidance_enabled)
+void ModeAuto::calc_throttle(float target_speed, bool avoidance_enabled)
 {
     // If not autostarting set the throttle to minimum
     if (!check_trigger()) {
         stop_vehicle();
         return;
     }
-    Mode::calc_throttle(target_speed, nudge_allowed, avoidance_enabled);
+    Mode::calc_throttle(target_speed, avoidance_enabled);
 }
 
 // return distance (in meters) to destination
 float ModeAuto::get_distance_to_destination() const
 {
-    if (_submode == Auto_RTL) {
+    switch (_submode) {
+    case Auto_WP:
+        return _distance_to_destination;
+    case Auto_HeadingAndSpeed:
+        // no valid distance so return zero
+        return 0.0f;
+    case Auto_RTL:
         return rover.mode_rtl.get_distance_to_destination();
+    case Auto_Loiter:
+        return rover.mode_loiter.get_distance_to_destination();
+    case Auto_Guided:
+        return rover.mode_guided.get_distance_to_destination();
     }
-    return _distance_to_destination;
+
+    // this line should never be reached
+    return 0.0f;
 }
 
 // set desired location to drive to
-void ModeAuto::set_desired_location(const struct Location& destination, float next_leg_bearing_cd)
+bool ModeAuto::set_desired_location(const struct Location& destination, float next_leg_bearing_cd)
 {
     // call parent
-    Mode::set_desired_location(destination, next_leg_bearing_cd);
+    if (!Mode::set_desired_location(destination, next_leg_bearing_cd)) {
+        return false;
+    }
 
     _submode = Auto_WP;
+
+    return true;
 }
 
 // return true if vehicle has reached or even passed destination
@@ -138,7 +149,7 @@ bool ModeAuto::reached_destination() const
 {
     switch (_submode) {
     case Auto_WP:
-        return _reached_destination;
+        return g2.wp_nav.reached_destination();
         break;
     case Auto_HeadingAndSpeed:
         // always return true because this is the safer option to allow missions to continue
@@ -294,8 +305,7 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
 
     switch (cmd.id) {
     case MAV_CMD_NAV_WAYPOINT:  // Navigate to Waypoint
-        do_nav_wp(cmd, false);
-        break;
+        return do_nav_wp(cmd, false);
 
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:
         do_RTL();
@@ -303,8 +313,7 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
 
     case MAV_CMD_NAV_LOITER_UNLIM:  // Loiter indefinitely
     case MAV_CMD_NAV_LOITER_TIME:   // Loiter for specified time
-        do_nav_wp(cmd, true);
-        break;
+        return do_nav_wp(cmd, true);
 
     case MAV_CMD_NAV_GUIDED_ENABLE: // accept navigation commands from external nav computer
         do_nav_guided_enable(cmd);
@@ -476,8 +485,22 @@ void ModeAuto::do_RTL(void)
     start_RTL();
 }
 
-void ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd, bool always_stop_at_destination)
+bool ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd, bool always_stop_at_destination)
 {
+    // get heading to following waypoint (auto mode reduces speed to allow corning without large overshoot)
+    // in case of non-zero loiter duration, we provide heading-unknown to signal we should stop at the point
+    float next_leg_bearing_cd = AR_WPNAV_HEADING_UNKNOWN;
+    if (!always_stop_at_destination && loiter_duration == 0) {
+        next_leg_bearing_cd = mission.get_next_ground_course_cd(AR_WPNAV_HEADING_UNKNOWN);
+    }
+
+    // retrieve and sanitize target location
+    Location cmdloc = cmd.content.location;
+    cmdloc.sanitize(rover.current_loc);
+    if (!set_desired_location(cmdloc, next_leg_bearing_cd)) {
+        return false;
+    }
+
     // just starting so we haven't previously reached the waypoint
     previously_reached_wp = false;
 
@@ -487,17 +510,7 @@ void ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd, bool always_sto
     // this is the delay, stored in seconds
     loiter_duration = cmd.p1;
 
-    // get heading to following waypoint (auto mode reduces speed to allow corning without large overshoot)
-    // in case of non-zero loiter duration, we provide heading-unknown to signal we should stop at the point
-    float next_leg_bearing_cd = MODE_NEXT_HEADING_UNKNOWN;
-    if (!always_stop_at_destination && loiter_duration == 0) {
-        next_leg_bearing_cd = mission.get_next_ground_course_cd(MODE_NEXT_HEADING_UNKNOWN);
-    }
-
-    // retrieve and sanitize target location
-    Location cmdloc = cmd.content.location;
-    cmdloc.sanitize(rover.current_loc);
-    set_desired_location(cmdloc, next_leg_bearing_cd);
+    return true;
 }
 
 // start guided within auto to allow external navigation system to control vehicle
@@ -523,7 +536,7 @@ void ModeAuto::do_nav_set_yaw_speed(const AP_Mission::Mission_Command& cmd)
     }
 
     // set auto target
-    const float speed_max = get_speed_default();
+    const float speed_max = g2.wp_nav.get_default_speed();
     set_desired_heading_and_speed(desired_heading_cd, constrain_float(cmd.content.set_yaw_speed.speed, -speed_max, speed_max));
 }
 
@@ -595,7 +608,7 @@ bool ModeAuto::verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd)
 
     // if a location target was set, return true once vehicle is close
     if (guided_target.valid) {
-        if (rover.current_loc.get_distance(guided_target.loc) <= rover.g.waypoint_radius) {
+        if (rover.current_loc.get_distance(guided_target.loc) <= rover.g2.wp_nav.get_radius()) {
             return true;
         }
     }

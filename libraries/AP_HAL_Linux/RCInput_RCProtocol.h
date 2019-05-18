@@ -12,44 +12,39 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+/*
+  RC input system that uses libraries/AP_RCProtocol with UART based inputs
+  with either SBUS protocol or 115200 based protocols (or both)
+ */
 #pragma once
 
 #include <AP_HAL/AP_HAL.h>
+#include <AP_RCProtocol/AP_RCProtocol.h>
+#include "RCInput.h"
+#include <stdarg.h>
+
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_DISCO || \
     CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BLUE
 
-#include "RCInput.h"
-
 namespace Linux {
 
-class RCInput_115200 : public RCInput
-{
+class RCInput_RCProtocol : public RCInput {
 public:
-    RCInput_115200(const char *device) :
-       device_path(device) {}
+    RCInput_RCProtocol(const char *dev_sbus, const char *dev_115200);
     void init() override;
     void _timer_tick(void) override;
-    void set_device_path(const char *path);
 
 private:
-    const char *device_path;
-    int32_t fd = -1;
+    int open_sbus(const char *path);
+    int open_115200(const char *path);
 
-    enum Decoders {
-        DECODER_DSM=0,
-        DECODER_ST24,
-        DECODER_SUMD,
-        DECODER_SRXL,
-        DECODER_SYNC
-    };
-    enum Decoders decoder = DECODER_SYNC;
+    const char *dev_sbus;
+    const char *dev_115200;
 
-    uint8_t dsm_count;
-    uint8_t st24_count;
-    uint32_t last_input_ms;
+    int fd_sbus;
+    int fd_115200;
+    AP_RCProtocol rcp;
+};
 };
 
-}
-
-#endif // CONFIG_HAL_BOARD_SUBTYPE
+#endif

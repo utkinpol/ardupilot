@@ -121,3 +121,16 @@ private:
     bool _in_delay_callback : 1;
 
 };
+
+/*
+  helper macro and class to make using expect_delay_ms() safer and easier
+ */
+class ExpectDelay {
+public:
+    ExpectDelay(uint32_t ms);
+    ~ExpectDelay();
+};
+
+#define EXPECT_DELAY_MS(ms) DELAY_JOIN( ms, __COUNTER__ )
+#define DELAY_JOIN( ms, counter) _DO_DELAY_JOIN( ms, counter )
+#define _DO_DELAY_JOIN( ms, counter ) ExpectDelay _getdelay ## counter(ms)

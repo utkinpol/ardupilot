@@ -25,7 +25,6 @@
 #include <AP_Camera/AP_Camera.h>
 #include <AP_Gripper/AP_Gripper.h>
 #include <AP_BLHeli/AP_BLHeli.h>
-#include <AP_Common/Semaphore.h>
 #include <AP_RSSI/AP_RSSI.h>
 #include <AP_Scheduler/AP_Scheduler.h>
 #include <AP_Mount/AP_Mount.h>
@@ -686,13 +685,13 @@ void GCS_MAVLINK::handle_param_value(mavlink_message_t *msg)
     mount->handle_param_value(msg);
 }
 
-void GCS_MAVLINK::send_textv(MAV_SEVERITY severity, const char *fmt, va_list arg_list)
+void GCS_MAVLINK::send_textv(MAV_SEVERITY severity, const char *fmt, va_list arg_list) const
 {
     char text[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN+1];
     hal.util->vsnprintf(text, sizeof(text), fmt, arg_list);
     gcs().send_statustext(severity, (1<<chan), text);
 }
-void GCS_MAVLINK::send_text(MAV_SEVERITY severity, const char *fmt, ...)
+void GCS_MAVLINK::send_text(MAV_SEVERITY severity, const char *fmt, ...) const
 {
     va_list arg_list;
     va_start(arg_list, fmt);
@@ -1508,12 +1507,14 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
 
         // Try to get a new message
         if (mavlink_parse_char(chan, c, &msg, &status)) {
+            hal.util->persistent_data.last_mavlink_msgid = msg.msgid;
             hal.util->perf_begin(_perf_packet);
             packetReceived(status, msg);
             hal.util->perf_end(_perf_packet);
             parsed_packet = true;
             gcs_alternative_active[chan] = false;
             alternative.last_mavlink_ms = now_ms;
+            hal.util->persistent_data.last_mavlink_msgid = 0;
         }
 
         if (parsed_packet || i % 100 == 0) {
@@ -3009,22 +3010,31 @@ void GCS_MAVLINK::handle_rc_channels_override(const mavlink_message_t *msg)
     mavlink_rc_channels_override_t packet;
     mavlink_msg_rc_channels_override_decode(msg, &packet);
 
-    RC_Channels::set_override(0, packet.chan1_raw, tnow);
-    RC_Channels::set_override(1, packet.chan2_raw, tnow);
-    RC_Channels::set_override(2, packet.chan3_raw, tnow);
-    RC_Channels::set_override(3, packet.chan4_raw, tnow);
-    RC_Channels::set_override(4, packet.chan5_raw, tnow);
-    RC_Channels::set_override(5, packet.chan6_raw, tnow);
-    RC_Channels::set_override(6, packet.chan7_raw, tnow);
-    RC_Channels::set_override(7, packet.chan8_raw, tnow);
-    RC_Channels::set_override(8, packet.chan9_raw, tnow);
-    RC_Channels::set_override(9, packet.chan10_raw, tnow);
-    RC_Channels::set_override(10, packet.chan11_raw, tnow);
-    RC_Channels::set_override(11, packet.chan12_raw, tnow);
-    RC_Channels::set_override(12, packet.chan13_raw, tnow);
-    RC_Channels::set_override(13, packet.chan14_raw, tnow);
-    RC_Channels::set_override(14, packet.chan15_raw, tnow);
-    RC_Channels::set_override(15, packet.chan16_raw, tnow);
+    const uint16_t override_data[] = {
+        packet.chan1_raw,
+        packet.chan2_raw,
+        packet.chan3_raw,
+        packet.chan4_raw,
+        packet.chan5_raw,
+        packet.chan6_raw,
+        packet.chan7_raw,
+        packet.chan8_raw,
+        packet.chan9_raw,
+        packet.chan10_raw,
+        packet.chan11_raw,
+        packet.chan12_raw,
+        packet.chan13_raw,
+        packet.chan14_raw,
+        packet.chan15_raw,
+        packet.chan16_raw
+    };
+
+    for (uint8_t i=0; i<ARRAY_SIZE(override_data); i++) {
+        // Per MAVLink spec a value of UINT16_MAX means to ignore this field.
+        if (override_data[i] != UINT16_MAX) {
+            RC_Channels::set_override(i, override_data[i], tnow);
+        }
+    }
 }
 
 // allow override of RC channel values for HIL or for complete GCS
@@ -3729,10 +3739,14 @@ void GCS_MAVLINK::handle_command_long(mavlink_message_t *msg)
     mavlink_command_long_t packet;
     mavlink_msg_command_long_decode(msg, &packet);
 
+    hal.util->persistent_data.last_mavlink_cmd = packet.command;
+
     const MAV_RESULT result = handle_command_long_packet(packet);
 
     // send ACK or NAK
     mavlink_msg_command_ack_send(chan, packet.command, result);
+
+    hal.util->persistent_data.last_mavlink_cmd = 0;
 }
 
 MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const Location &roi_loc)
@@ -3846,10 +3860,14 @@ void GCS_MAVLINK::handle_command_int(mavlink_message_t *msg)
     mavlink_command_int_t packet;
     mavlink_msg_command_int_decode(msg, &packet);
 
+    hal.util->persistent_data.last_mavlink_cmd = packet.command;
+
     const MAV_RESULT result = handle_command_int_packet(packet);
 
     // send ACK or NAK
     mavlink_msg_command_ack_send(chan, packet.command, result);
+
+    hal.util->persistent_data.last_mavlink_cmd = 0;
 }
 
 bool GCS_MAVLINK::try_send_compass_message(const enum ap_message id)
@@ -4419,10 +4437,17 @@ void GCS_MAVLINK::initialise_message_intervals_from_streamrates()
     for (uint8_t i=0; all_stream_entries[i].ap_message_ids != nullptr; i++) {
         initialise_message_intervals_for_stream(all_stream_entries[i].stream_id);
     }
+    set_mavlink_message_id_interval(MAVLINK_MSG_ID_HEARTBEAT, 1000);
 }
 
 bool GCS_MAVLINK::get_default_interval_for_ap_message(const ap_message id, uint16_t &interval) const
 {
+    if (id == MSG_HEARTBEAT) {
+        // handle heartbeat requests as a special case because heartbeat is not "streamed"
+        interval = 1000;
+        return true;
+    }
+
     // find which stream this ap_message is in
     for (uint8_t i=0; all_stream_entries[i].ap_message_ids != nullptr; i++) {
         const GCS_MAVLINK::stream_entries &entries = all_stream_entries[i];

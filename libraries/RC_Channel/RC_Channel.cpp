@@ -332,12 +332,7 @@ void RC_Channel::set_override(const uint16_t v, const uint32_t timestamp_us)
     if (!rc().gcs_overrides_enabled()) {
         return;
     }
-    // this UINT16_MAX stuff should really, really be in the
-    // mavlink packet handling code.  It can be moved once that
-    // code is in the GCS_MAVLink class!
-    if (v == UINT16_MAX) {
-        return;
-    }
+
     last_override_time = timestamp_us != 0 ? timestamp_us : AP_HAL::millis();
     override_value = v;
     rc().new_override_received();
@@ -357,6 +352,26 @@ bool RC_Channel::has_override() const
 
     const float override_timeout_ms = rc().override_timeout_ms();
     return is_positive(override_timeout_ms) && ((AP_HAL::millis() - last_override_time) < (uint32_t)override_timeout_ms);
+}
+
+/*
+  perform stick mixing on one channel
+  This type of stick mixing reduces the influence of the auto
+  controller as it increases the influence of the users stick input,
+  allowing the user full deflection if needed
+ */
+int16_t RC_Channel::stick_mixing(const int16_t servo_in)
+{
+    float ch_inf = (float)(radio_in - radio_trim);
+    ch_inf = fabsf(ch_inf);
+    ch_inf = MIN(ch_inf, 400.0f);
+    ch_inf = ((400.0f - ch_inf) / 400.0f);
+
+    int16_t servo_out = servo_in;
+    servo_out *= ch_inf;
+    servo_out += control_in;
+
+    return servo_out;
 }
 
 //

@@ -7,10 +7,44 @@ import json
 import os
 import re
 import fnmatch
+import gen_stable
 
 FIRMWARE_TYPES = ["AntennaTracker", "Copter", "Plane", "Rover", "Sub"]
 RELEASE_TYPES = ["beta", "latest", "stable", "stable-*"]
 
+# mapping for board names to brand name and manufacturer
+brand_map = {
+    'Pixhawk4' : ('Pixhawk 4', 'Holybro'),
+    'Pixhawk6' : ('Pixhawk 6', 'Holybro'),
+    'PH4-mini' : ('Pixhawk 4 Mini', 'Holybro'),
+    'KakuteF4' : ('KakuteF4', 'Holybro'),
+    'KakuteF7' : ('KakuteF7', 'Holybro'),
+    'CubeBlack' : ('CubeBlack', 'Hex/ProfiCNC'),
+    'CubeYellow' : ('CubeYellow', 'Hex/ProfiCNC'),
+    'CubeOrange' : ('CubeOrange', 'Hex/ProfiCNC'),
+    'CubePurple' : ('CubePurple', 'Hex/ProfiCNC'),
+    'CubeSolo' : ('CubeSolo', '3DR'),
+    'CubeGreen-solo' : ('CubeGreen Solo', 'Hex/ProfiCNC'),
+    'CUAVv5' : ('CUAVv5', 'CUAV'),
+    'CUAVv5Nano' : ('CUAVv5 Nano', 'CUAV'),
+    'DrotekP3Pro' : ('Pixhawk 3 Pro', 'Drotek'),
+    'MatekF405' : ('Matek F405', 'Matek'),
+    'MatekF405-STD' : ('Matek F405 STD', 'Matek'),
+    'MatekF405-Wing' : ('Matek F405 Wing', 'Matek'),
+    'mini-pix' : ('MiniPix', 'Radiolink'),
+    'Pixhawk1' : ('Pixhawk1', 'mRobotics'),
+    'Pixracer' : ('PixRacer', 'mRobotics'),
+    'mRoX21' : ('mRo X2.1', 'mRobotics'),
+    'mRoX21-777' : ('mRo X2.1-777', 'mRobotics'),
+    'TBS-Colibri-F7' : ('Colibri F7', 'TBS'),
+    'sparky2' : ('Sparky2', 'TauLabs'),
+    'mindpx-v2' : ('MindPX V2', 'AirMind'),
+    'OMNIBUSF7V2' : ('Omnibus F7 V2', 'Airbot'),
+    'omnibusf4pro' : ('Omnibus F4 Pro', 'Airbot'),
+    'omnibusf4v6' : ('Omnibus F4 V6', 'Airbot'),
+    'OmnibusNanoV6' : ('Omnibus Nano V6', 'Airbot'),
+    'speedybeef4' : ('SpeedyBee F4', 'SpeedyBee'),
+}
 
 class Firmware():
     def __init__(self,
@@ -180,6 +214,11 @@ class ManifestGenerator():
             # special case for MindPX-v2 boards
             firmware['bootloader_str'].append('MindPX BL FMU v2.x')
             firmware['USBID'].append('0x26AC/0x0030')
+
+        if platform in brand_map:
+            (brand_name, manufacturer) = brand_map[platform]
+            firmware['brand_name'] = brand_name
+            firmware['manufacturer'] = manufacturer
 
     def add_USB_IDs(self, firmware):
         '''add USB IDs to a firmware'''
@@ -432,6 +471,9 @@ if __name__ == "__main__":
     parser.add_argument('basedir', type=str, default="-", help='base binaries directory')
 
     args = parser.parse_args()
+
+    # ensure all stable directories are created
+    gen_stable.make_all_stable(args.basedir)
 
     generator = ManifestGenerator(args.basedir, args.baseurl)
     if args.outfile is None:

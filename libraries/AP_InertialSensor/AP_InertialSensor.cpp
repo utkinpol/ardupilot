@@ -873,6 +873,13 @@ AP_InertialSensor::detect_backends(void)
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_CHIBIOS_OMNIBUSF7V2
     ADD_BACKEND(AP_InertialSensor_Invensense::probe(*this, hal.spi->get_device("mpu6000"), ROTATION_NONE));
     ADD_BACKEND(AP_InertialSensor_Invensense::probe(*this, hal.spi->get_device("mpu6500"), ROTATION_YAW_90));
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_CHIBIOS_MROCONTROLZEROF7
+    ADD_BACKEND(AP_InertialSensor_Invensensev2::probe(*this, hal.spi->get_device("icm20948"), ROTATION_ROLL_180_YAW_90));
+    ADD_BACKEND(AP_InertialSensor_Invensense::probe(*this, hal.spi->get_device("icm20608"), ROTATION_ROLL_180_YAW_90));
+    ADD_BACKEND(AP_InertialSensor_BMI088::probe(*this,
+                                                hal.spi->get_device("bmi088_a"),
+                                                hal.spi->get_device("bmi088_g"),
+                                                ROTATION_NONE));
 #elif HAL_INS_DEFAULT == HAL_INS_NONE
     // no INS device
 #else
@@ -1115,7 +1122,7 @@ AP_InertialSensor::_init_gyro()
     // cold start
     hal.console->printf("Init Gyro");
 
-    hal.scheduler->expect_delay_ms(60000);
+    EXPECT_DELAY_MS(60000);
 
     /*
       we do the gyro calibration with no board rotation. This avoids
@@ -1231,8 +1238,6 @@ AP_InertialSensor::_init_gyro()
 
     // stop flashing leds
     AP_Notify::flags.initialising = false;
-
-    hal.scheduler->expect_delay_ms(0);
 }
 
 // save parameters to eeprom
@@ -1697,13 +1702,12 @@ void AP_InertialSensor::acal_update()
         return;
     }
 
-    hal.scheduler->expect_delay_ms(20000);
+    EXPECT_DELAY_MS(20000);
     _acal->update();
 
     if (hal.util->get_soft_armed() && _acal->get_status() != ACCEL_CAL_NOT_STARTED) {
         _acal->cancel();
     }
-    hal.scheduler->expect_delay_ms(0);
 }
 
 /*
@@ -1860,6 +1864,7 @@ MAV_RESULT AP_InertialSensor::simple_accel_cal()
         return MAV_RESULT_TEMPORARILY_REJECTED;
     }
 
+    EXPECT_DELAY_MS(20000);
     // record we are calibrating
     _calibrating = true;
 

@@ -32,13 +32,11 @@ MAV_MODE GCS_MAVLINK_Rover::base_mode() const
         _base_mode |= MAV_MODE_FLAG_GUIDED_ENABLED;
     }
 
-#if defined(ENABLE_STICK_MIXING) && (ENABLE_STICK_MIXING == ENABLED) // TODO ???? Remove !
-    if (control_mode->stick_mixing_enabled()) {
+    if (rover.g2.stick_mixing > 0 && rover.control_mode != &rover.mode_initializing) {
         // all modes except INITIALISING have some form of manual
         // override if stick mixing is enabled
         _base_mode |= MAV_MODE_FLAG_MANUAL_INPUT_ENABLED;
     }
-#endif
 
 #if HIL_MODE != HIL_MODE_DISABLED
     _base_mode |= MAV_MODE_FLAG_HIL_ENABLED;
@@ -513,8 +511,7 @@ bool GCS_MAVLINK_Rover::handle_guided_request(AP_Mission::Mission_Command &cmd)
     }
 
     // make any new wp uploaded instant (in case we are already in Guided mode)
-    rover.mode_guided.set_desired_location(cmd.content.location);
-    return true;
+    return rover.mode_guided.set_desired_location(cmd.content.location);
 }
 
 void GCS_MAVLINK_Rover::handle_change_alt_request(AP_Mission::Mission_Command &cmd)
@@ -826,7 +823,10 @@ void GCS_MAVLINK_Rover::handleMessage(mavlink_message_t* msg)
             // set guided mode targets
             if (!pos_ignore) {
                 // consume position target
-                rover.mode_guided.set_desired_location(target_loc);
+                if (!rover.mode_guided.set_desired_location(target_loc)) {
+                    // GCS will need to monitor desired location to
+                    // see if they are having an effect.
+                }
             } else if (pos_ignore && !vel_ignore && acc_ignore && yaw_ignore && yaw_rate_ignore) {
                 // consume velocity
                 rover.mode_guided.set_desired_heading_and_speed(target_yaw_cd, speed_dir * target_speed);
@@ -928,7 +928,10 @@ void GCS_MAVLINK_Rover::handleMessage(mavlink_message_t* msg)
             // set guided mode targets
             if (!pos_ignore) {
                 // consume position target
-                rover.mode_guided.set_desired_location(target_loc);
+                if (!rover.mode_guided.set_desired_location(target_loc)) {
+                    // GCS will just need to look at desired location
+                    // outputs to see if it having an effect.
+                }
             } else if (pos_ignore && !vel_ignore && acc_ignore && yaw_ignore && yaw_rate_ignore) {
                 // consume velocity
                 rover.mode_guided.set_desired_heading_and_speed(target_yaw_cd, speed_dir * target_speed);

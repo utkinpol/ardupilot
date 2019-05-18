@@ -183,6 +183,12 @@ AP_Baro::AP_Baro()
 // the altitude() or climb_rate() interfaces can be used
 void AP_Baro::calibrate(bool save)
 {
+    // start by assuming all sensors are calibrated (for healthy() test)
+    for (uint8_t i=0; i<_num_sensors; i++) {
+        sensors[i].calibrated = true;
+        sensors[i].alt_ok = true;
+    }
+
     if (hal.util->was_watchdog_reset()) {
         gcs().send_text(MAV_SEVERITY_INFO, "Baro: skipping calibration");
         return;
@@ -192,12 +198,6 @@ void AP_Baro::calibrate(bool save)
     // reset the altitude offset when we calibrate. The altitude
     // offset is supposed to be for within a flight
     _alt_offset.set_and_save(0);
-
-    // start by assuming all sensors are calibrated (for healthy() test)
-    for (uint8_t i=0; i<_num_sensors; i++) {
-        sensors[i].calibrated = true;
-        sensors[i].alt_ok = true;
-    }
 
     // let the barometer settle for a full second after startup
     // the MS5611 reads quite a long way off for the first second,
@@ -576,6 +576,8 @@ void AP_Baro::init(void)
 #elif HAL_BARO_DEFAULT == HAL_BARO_DPS280_I2C
     ADD_BACKEND(AP_Baro_DPS280::probe(*this,
                                       std::move(hal.i2c_mgr->get_device(HAL_BARO_DPS280_I2C_BUS, HAL_BARO_DPS280_I2C_ADDR))));
+#elif HAL_BARO_DEFAULT == HAL_BARO_DPS280_SPI
+    ADD_BACKEND(AP_Baro_DPS280::probe(*this, std::move(hal.spi->get_device("dps280"))));
 #elif HAL_BARO_DEFAULT == HAL_BARO_LPS25H
 	ADD_BACKEND(AP_Baro_LPS2XH::probe(*this,
                                       std::move(hal.i2c_mgr->get_device(HAL_BARO_LPS25H_I2C_BUS, HAL_BARO_LPS25H_I2C_ADDR))));
