@@ -7,8 +7,8 @@
 #if ADVANCED_FAILSAFE == ENABLED
 
 // Constructor
-AP_AdvancedFailsafe_Copter::AP_AdvancedFailsafe_Copter(AP_Mission &_mission, const AP_GPS &_gps) :
-    AP_AdvancedFailsafe(_mission, _gps)
+AP_AdvancedFailsafe_Copter::AP_AdvancedFailsafe_Copter(AP_Mission &_mission) :
+    AP_AdvancedFailsafe(_mission)
 {}
 
 
@@ -25,7 +25,7 @@ void AP_AdvancedFailsafe_Copter::terminate_vehicle(void)
         copter.motors->output();
 
         // disarm as well
-        copter.init_disarm_motors();
+        copter.arming.disarm();
     
         // and set all aux channels
         SRV_Channels::set_output_limit(SRV_Channel::k_heli_rsc, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);

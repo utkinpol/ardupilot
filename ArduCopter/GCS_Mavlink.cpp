@@ -2,12 +2,6 @@
 
 #include "GCS_Mavlink.h"
 
-void Copter::gcs_send_heartbeat(void)
-{
-    gcs().send_message(MSG_HEARTBEAT);
-}
-
-
 /*
  *  !!NOTE!!
  *
@@ -164,7 +158,7 @@ void GCS_MAVLINK_Copter::send_nav_controller_output() const
         return;
     }
     const Vector3f &targets = copter.attitude_control->get_att_target_euler_cd();
-    const Copter::Mode *flightmode = copter.flightmode;
+    const Mode *flightmode = copter.flightmode;
     mavlink_msg_nav_controller_output_send(
         chan,
         targets.x * 1.0e-2f,
@@ -606,6 +600,11 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_mount(const mavlink_command_long_t
     return GCS_MAVLINK::handle_command_mount(packet);
 }
 
+bool GCS_MAVLINK_Copter::allow_disarm() const
+{
+    return copter.ap.land_complete;
+}
+
 MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_long_t &packet)
 {
     switch(packet.command) {
@@ -698,26 +697,6 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         }
         return MAV_RESULT_FAILED;
 #endif
-
-    case MAV_CMD_COMPONENT_ARM_DISARM:
-        if (is_equal(packet.param1,1.0f)) {
-            // attempt to arm and return success or failure
-            const bool do_arming_checks = !is_equal(packet.param2,magic_force_arm_value);
-            if (copter.init_arm_motors(AP_Arming::Method::MAVLINK, do_arming_checks)) {
-                return MAV_RESULT_ACCEPTED;
-            }
-        } else if (is_zero(packet.param1))  {
-            if (copter.ap.land_complete || is_equal(packet.param2,magic_force_disarm_value)) {
-                // force disarming by setting param2 = 21196 is deprecated
-                copter.init_disarm_motors();
-                return MAV_RESULT_ACCEPTED;
-            } else {
-                return MAV_RESULT_FAILED;
-            }
-        } else {
-            return MAV_RESULT_UNSUPPORTED;
-        }
-        return MAV_RESULT_FAILED;
 
 #if PARACHUTE == ENABLED
     case MAV_CMD_DO_PARACHUTE:
@@ -819,7 +798,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
 
         if (!copter.motors->armed()) {
             // if disarmed, arm motors
-            copter.init_arm_motors(AP_Arming::Method::MAVLINK);
+            copter.arming.arm(AP_Arming::Method::MAVLINK);
         } else if (copter.ap.land_complete) {
             // if armed and landed, takeoff
             if (copter.set_mode(LOITER, MODE_REASON_GCS_COMMAND)) {
@@ -841,7 +820,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         if (copter.motors->armed()) {
             if (copter.ap.land_complete) {
                 // if landed, disarm motors
-                copter.init_disarm_motors();
+                copter.arming.disarm();
             } else {
                 // assume that shots modes are all done in guided.
                 // NOTE: this may need to change if we add a non-guided shot mode
@@ -1276,7 +1255,7 @@ void Copter::mavlink_delay_cb()
     uint32_t tnow = millis();
     if (tnow - last_1hz > 1000) {
         last_1hz = tnow;
-        gcs_send_heartbeat();
+        gcs().send_message(MSG_HEARTBEAT);
         gcs().send_message(MSG_SYS_STATUS);
     }
     if (tnow - last_50hz > 20) {
@@ -1309,7 +1288,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_flight_termination(const mavlink_command_l
     if (GCS_MAVLINK::handle_flight_termination(packet) != MAV_RESULT_ACCEPTED) {
 #endif
         if (packet.param1 > 0.5f) {
-            copter.init_disarm_motors();
+            copter.arming.disarm();
             result = MAV_RESULT_ACCEPTED;
         }
 #if ADVANCED_FAILSAFE == ENABLED

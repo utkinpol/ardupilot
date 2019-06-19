@@ -6,6 +6,7 @@
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_RangeFinder/RangeFinder_Backend.h>
+#include <AP_GPS/AP_GPS.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -708,7 +709,7 @@ void NavEKF3_core::readAirSpdData()
     if (aspeed &&
             aspeed->use() &&
             (aspeed->last_update_ms() - timeTasReceived_ms) > frontend->sensorIntervalMin_ms) {
-        tasDataNew.tas = aspeed->get_raw_airspeed() * aspeed->get_EAS2TAS();
+        tasDataNew.tas = aspeed->get_raw_airspeed() * AP::ahrs().get_EAS2TAS();
         timeTasReceived_ms = aspeed->last_update_ms();
         tasDataNew.time_ms = timeTasReceived_ms - frontend->tasDelay_ms;
 

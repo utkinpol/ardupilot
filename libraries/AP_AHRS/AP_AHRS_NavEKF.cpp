@@ -24,6 +24,7 @@
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Module/AP_Module.h>
+#include <AP_GPS/AP_GPS.h>
 
 #if AP_AHRS_NAVEKF_AVAILABLE
 
@@ -130,6 +131,11 @@ void AP_AHRS_NavEKF::update(bool skip_ins_update)
         // update optional alternative attitude view
         _view->update(skip_ins_update);
     }
+
+#if !HAL_MINIMIZE_FEATURES && AP_AHRS_NAVEKF_AVAILABLE
+    // update NMEA output
+    update_nmea_out();
+#endif
 }
 
 void AP_AHRS_NavEKF::update_DCM(bool skip_ins_update)
@@ -1766,6 +1772,28 @@ uint8_t AP_AHRS_NavEKF::get_primary_gyro_index(void) const
         return get_primary_IMU_index();
     }
     return AP::ins().get_primary_gyro();
+}
+
+// see if EKF lane switching is possible to avoid EKF failsafe
+void AP_AHRS_NavEKF::check_lane_switch(void)
+{
+    switch (active_EKF_type()) {
+    case EKF_TYPE_NONE:
+        break;
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    case EKF_TYPE_SITL:
+        break;
+#endif
+
+    case EKF_TYPE2:
+        EKF2.checkLaneSwitch();
+        break;
+
+    case EKF_TYPE3:
+        EKF3.checkLaneSwitch();
+        break;
+    }
 }
 
 

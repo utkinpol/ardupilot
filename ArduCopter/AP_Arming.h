@@ -20,16 +20,18 @@ public:
     AP_Arming_Copter &operator=(const AP_Arming_Copter&) = delete;
 
     void update(void);
-    bool all_checks_passing(AP_Arming::Method method);
 
     bool rc_calibration_checks(bool display_failure) override;
+
+    bool disarm() override;
+    bool arm(AP_Arming::Method method, bool do_arming_checks=true) override;
 
 protected:
 
     bool pre_arm_checks(bool display_failure) override;
     bool pre_arm_ekf_attitude_check();
     bool pre_arm_terrain_check(bool display_failure);
-    bool pre_arm_proximity_check(bool display_failure);
+    bool proximity_checks(bool display_failure) const override;
     bool arm_checks(AP_Arming::Method method) override;
 
     // NOTE! the following check functions *DO* call into AP_Arming:
@@ -47,5 +49,9 @@ protected:
     void set_pre_arm_check(bool b);
 
 private:
+
+    // actually contains the pre-arm checks.  This is wrapped so that
+    // we can store away success/failure of the checks.
+    bool run_pre_arm_checks(bool display_failure);
 
 };

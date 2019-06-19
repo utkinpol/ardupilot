@@ -12,11 +12,18 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-// Copyright (C) 2010 Swift Navigation Inc.
-// Contact: Fergus Noble <fergus@swift-nav.com>
 #pragma once
 
-#include <inttypes.h>
+#include "AP_WindVane_Backend.h"
 
-uint16_t crc16_ccitt(const uint8_t *buf, uint32_t len, uint16_t crc);
+#include <AP_Airspeed/AP_Airspeed.h>
+
+class AP_WindVane_Airspeed : public AP_WindVane_Backend
+{
+public:
+    // constructor
+    AP_WindVane_Airspeed(AP_WindVane &frontend);
+
+    // update state
+    void update_speed() override;
+};

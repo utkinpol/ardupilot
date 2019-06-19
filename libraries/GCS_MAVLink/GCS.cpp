@@ -1,5 +1,6 @@
 #include "GCS.h"
 #include <AP_Logger/AP_Logger.h>
+#include <AP_BattMonitor/AP_BattMonitor.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -13,6 +14,14 @@ void GCS::get_sensor_status_flags(uint32_t &present,
     enabled = control_sensors_enabled;
     health = control_sensors_health;
 }
+
+MissionItemProtocol_Waypoints *GCS::_missionitemprotocol_waypoints;
+MissionItemProtocol_Rally *GCS::_missionitemprotocol_rally;
+
+const MAV_MISSION_TYPE GCS_MAVLINK::supported_mission_types[] = {
+    MAV_MISSION_TYPE_MISSION,
+    MAV_MISSION_TYPE_RALLY,
+};
 
 /*
   send a text message to all GCS
@@ -32,22 +41,38 @@ void GCS::send_text(MAV_SEVERITY severity, const char *fmt, ...)
     va_end(arg_list);
 }
 
-#define FOR_EACH_ACTIVE_CHANNEL(methodcall)          \
-    do {                                             \
-        for (uint8_t i=0; i<num_gcs(); i++) {        \
-            if (!chan(i).initialised) {              \
-                continue;                            \
-            }                                        \
-            if (!(GCS_MAVLINK::active_channel_mask() & (1 << (chan(i).get_chan()-MAVLINK_COMM_0)))) { \
-                continue;                            \
-            }                                        \
-            chan(i).methodcall;                      \
-        }                                            \
-    } while (0)
+void GCS::send_to_active_channels(uint32_t msgid, const char *pkt)
+{
+    const mavlink_msg_entry_t *entry = mavlink_get_msg_entry(msgid);
+    if (entry == nullptr) {
+        return;
+    }
+    for (uint8_t i=0; i<num_gcs(); i++) {
+        GCS_MAVLINK &c = chan(i);
+        if (!c.initialised) {
+            continue;
+        }
+        if (!c.is_active()) {
+            continue;
+        }
+        if (entry->max_msg_len + c.packet_overhead() > c.get_uart()->txspace()) {
+            // no room on this channel
+            continue;
+        }
+        c.send_message(pkt, entry);
+    }
+}
 
 void GCS::send_named_float(const char *name, float value) const
 {
-    FOR_EACH_ACTIVE_CHANNEL(send_named_float(name, value));
+
+    mavlink_named_value_float_t packet;
+    packet.time_boot_ms = AP_HAL::millis();
+    packet.value = value;
+    memcpy(packet.name, name, MIN(strlen(name), (uint8_t)MAVLINK_MSG_NAMED_VALUE_FLOAT_FIELD_NAME_LEN));
+
+    gcs().send_to_active_channels(MAVLINK_MSG_ID_NAMED_VALUE_FLOAT,
+                                  (const char *)&packet);
 }
 
 /*

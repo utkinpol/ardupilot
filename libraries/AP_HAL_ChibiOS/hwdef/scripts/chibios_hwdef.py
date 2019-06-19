@@ -74,6 +74,11 @@ env_vars = {}
 # build flags for ChibiOS makefiles
 build_flags = []
 
+# sensor lists
+imu_list = []
+compass_list = []
+baro_list = []
+
 mcu_type = None
 
 
@@ -567,6 +572,7 @@ def write_mcu_config(f):
             f.write('#define %s\n' % d[7:])
     flash_size = get_config('FLASH_SIZE_KB', type=int)
     f.write('#define BOARD_FLASH_SIZE %u\n' % flash_size)
+    env_vars['BOARD_FLASH_SIZE'] = flash_size
     f.write('#define CRT1_AREAS_NUMBER 1\n')
 
     flash_reserve_start = get_config(
@@ -759,7 +765,100 @@ def write_SPI_config(f):
     f.write('#define HAL_SPI_BUS_LIST %s\n\n' % ','.join(devlist))
     write_SPI_table(f)
 
+def parse_spi_device(dev):
+    '''parse a SPI:xxx device item'''
+    a = dev.split(':')
+    if len(a) != 2:
+        error("Bad SPI device: %s" % dev)
+    return 'hal.spi->get_device("%s")' % a[1]
 
+def parse_i2c_device(dev):
+    '''parse a I2C:xxx:xxx device item'''
+    a = dev.split(':')
+    if len(a) != 3:
+        error("Bad I2C device: %s" % dev)
+    busaddr = int(a[2],base=0)
+    if a[1] == 'ALL_EXTERNAL':
+        return ('FOREACH_I2C_EXTERNAL(b)', 'hal.i2c_mgr->get_device(b,0x%02x)' % (busaddr))
+    elif a[1] == 'ALL_INTERNAL':
+        return ('FOREACH_I2C_INTERNAL(b)', 'hal.i2c_mgr->get_device(b,0x%02x)' % (busaddr))
+    elif a[1] == 'ALL':
+        return ('FOREACH_I2C(b)', 'hal.i2c_mgr->get_device(b,0x%02x)' % (busaddr))
+    busnum = int(a[1])
+    return ('', 'hal.i2c_mgr->get_device(%u,0x%02x)' % (busnum, busaddr))
+
+def write_IMU_config(f):
+    '''write IMU config defines'''
+    global imu_list
+    devlist = []
+    wrapper = ''
+    for dev in imu_list:
+        driver = dev[0]
+        for i in range(1,len(dev)):
+            if dev[i].startswith("SPI:"):
+                dev[i] = parse_spi_device(dev[i])
+            elif dev[i].startswith("I2C:"):
+                (wrapper, dev[i]) = parse_i2c_device(dev[i])
+        n = len(devlist)+1
+        devlist.append('HAL_INS_PROBE%u' % n)
+        f.write(
+            '#define HAL_INS_PROBE%u %s ADD_BACKEND(AP_InertialSensor_%s::probe(*this,%s))\n'
+            % (n, wrapper, driver, ','.join(dev[1:])))
+    if len(devlist) > 0:
+        f.write('#define HAL_INS_PROBE_LIST %s\n\n' % ';'.join(devlist))
+
+def write_MAG_config(f):
+    '''write IMU config defines'''
+    global compass_list
+    devlist = []
+    for dev in compass_list:
+        driver = dev[0]
+        probe = 'probe'
+        wrapper = ''
+        a = driver.split(':')
+        driver = a[0]
+        if len(a) > 1 and a[1].startswith('probe'):
+            probe = a[1]
+        for i in range(1,len(dev)):
+            if dev[i].startswith("SPI:"):
+                dev[i] = parse_spi_device(dev[i])
+            elif dev[i].startswith("I2C:"):
+                (wrapper, dev[i]) = parse_i2c_device(dev[i])
+        n = len(devlist)+1
+        devlist.append('HAL_MAG_PROBE%u' % n)
+        f.write(
+            '#define HAL_MAG_PROBE%u %s ADD_BACKEND(DRIVER_%s, AP_Compass_%s::%s(%s))\n'
+            % (n, wrapper, driver, driver, probe, ','.join(dev[1:])))
+    if len(devlist) > 0:
+        f.write('#define HAL_MAG_PROBE_LIST %s\n\n' % ';'.join(devlist))
+
+def write_BARO_config(f):
+    '''write barometer config defines'''
+    global baro_list
+    devlist = []
+    for dev in baro_list:
+        driver = dev[0]
+        probe = 'probe'
+        wrapper = ''
+        a = driver.split(':')
+        driver = a[0]
+        if len(a) > 1 and a[1].startswith('probe'):
+            probe = a[1]
+        for i in range(1,len(dev)):
+            if dev[i].startswith("SPI:"):
+                dev[i] = parse_spi_device(dev[i])
+            elif dev[i].startswith("I2C:"):
+                (wrapper, dev[i]) = parse_i2c_device(dev[i])
+                if dev[i].startswith('hal.i2c_mgr'):
+                    dev[i] = 'std::move(%s)' % dev[i]
+        n = len(devlist)+1
+        devlist.append('HAL_BARO_PROBE%u' % n)
+        f.write(
+            '#define HAL_BARO_PROBE%u %s ADD_BACKEND(AP_Baro_%s::%s(*this,%s))\n'
+            % (n, wrapper, driver, probe, ','.join(dev[1:])))
+    if len(devlist) > 0:
+        f.write('#define HAL_BARO_PROBE_LIST %s\n\n' % ';'.join(devlist))
+    
 def get_gpio_bylabel(label):
     '''get GPIO(n) setting on a pin label, or -1'''
     p = bylabel.get(label)
@@ -1247,6 +1346,9 @@ def write_hwdef_header(outfilename):
     write_SPI_config(f)
     write_ADC_config(f)
     write_GPIO_config(f)
+    write_IMU_config(f)
+    write_MAG_config(f)
+    write_BARO_config(f)
 
     write_peripheral_enable(f)
     setup_apj_IDs()
@@ -1419,7 +1521,7 @@ def romfs_wildcard(pattern):
     
 def process_line(line):
     '''process one line of pin definition file'''
-    global allpins
+    global allpins, imu_list, compass_list, baro_list
     a = shlex.split(line)
     # keep all config lines for later use
     alllines.append(line)
@@ -1457,6 +1559,12 @@ def process_line(line):
             p.af = af
     if a[0] == 'SPIDEV':
         spidev.append(a[1:])
+    if a[0] == 'IMU':
+        imu_list.append(a[1:])
+    if a[0] == 'COMPASS':
+        compass_list.append(a[1:])
+    if a[0] == 'BARO':
+        baro_list.append(a[1:])
     if a[0] == 'ROMFS':
         romfs_add(a[1],a[2])
     if a[0] == 'ROMFS_WILDCARD':
@@ -1480,6 +1588,12 @@ def process_line(line):
                 continue
             newpins.append(pin)
         allpins = newpins
+        if a[1] == 'IMU':
+            imu_list = []
+        if a[1] == 'COMPASS':
+            compass_list = []
+        if a[1] == 'BARO':
+            baro_list = []
     if a[0] == 'env':
         print("Adding environment %s" % ' '.join(a[1:]))
         if len(a[1:]) < 2:

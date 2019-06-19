@@ -9,7 +9,6 @@
 #include <AP_InertialSensor/AP_InertialSensor.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Mission/AP_Mission.h>
-#include <AP_BattMonitor/AP_BattMonitor.h>
 #include <AP_RPM/AP_RPM.h>
 #include <AP_Logger/LogStructure.h>
 #include <AP_Motors/AP_Motors.h>
@@ -236,6 +235,7 @@ public:
     void Write_RCIN(void);
     void Write_RCOUT(void);
     void Write_RSSI();
+    void Write_Rally();
     void Write_Baro(uint64_t time_us=0);
     void Write_Power(void);
     void Write_AHRS2(AP_AHRS &ahrs);
@@ -273,6 +273,7 @@ public:
     void Write_Beacon(AP_Beacon &beacon);
     void Write_Proximity(AP_Proximity &proximity);
     void Write_SRTL(bool active, uint16_t num_points, uint16_t max_points, uint8_t action, const Vector3f& point);
+    void Write_OA(uint8_t algorithm, const Location& final_dest, const Location& oa_dest);
 
     void Write(const char *name, const char *labels, const char *fmt, ...);
     void Write(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, ...);
