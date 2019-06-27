@@ -9,7 +9,6 @@
 #include <AP_Mission/AP_Mission.h>
 #include <stdint.h>
 #include "MAVLink_routing.h"
-#include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Avoidance/AP_Avoidance.h>
 #include <AP_Frsky_Telem/AP_Frsky_Telem.h>
 #include <AP_AdvancedFailsafe/AP_AdvancedFailsafe.h>
@@ -297,7 +296,7 @@ public:
     void        update_receive(uint32_t max_time_us=1000);
     void        update_send();
     void        init(AP_HAL::UARTDriver *port, mavlink_channel_t mav_chan);
-    void        setup_uart(const AP_SerialManager& serial_manager, AP_SerialManager::SerialProtocol protocol, uint8_t instance);
+    void        setup_uart(uint8_t instance);
     void        send_message(enum ap_message id);
     void        send_text(MAV_SEVERITY severity, const char *fmt, ...) const;
     void        send_textv(MAV_SEVERITY severity, const char *fmt, va_list arg_list) const;
@@ -620,6 +619,7 @@ protected:
 
     MAV_RESULT handle_command_preflight_can(const mavlink_command_long_t &packet);
 
+    MAV_RESULT handle_command_battery_reset(const mavlink_command_long_t &packet);
     void handle_command_long(mavlink_message_t* msg);
     MAV_RESULT handle_command_accelcal_vehicle_pos(const mavlink_command_long_t &packet);
     virtual MAV_RESULT handle_command_mount(const mavlink_command_long_t &packet);
@@ -805,8 +805,6 @@ private:
     // mavlink routing object
     static MAVLink_routing routing;
 
-    static const AP_SerialManager *serialmanager_p;
-
     struct pending_param_request {
         mavlink_channel_t chan;
         int16_t param_index;
@@ -966,17 +964,19 @@ public:
 
     void update_send();
     void update_receive();
-    virtual void setup_uarts(AP_SerialManager &serial_manager);
+    virtual void setup_uarts();
 
-    bool out_of_time() const {
-        return _out_of_time;
+    // minimum amount of time (in microseconds) that must remain in
+    // the main scheduler loop before we are allowed to send any
+    // mavlink messages.  We want to prioritise the main flight
+    // control loop over communications
+    virtual uint16_t min_loop_time_remaining_for_message_send_us() const {
+        return 200;
     }
-    void set_out_of_time(bool val) {
-        _out_of_time = val;
-    }
+    bool out_of_time() const;
 
     // frsky backend
-    AP_Frsky_Telem frsky;
+    AP_Frsky_Telem *frsky;
 
     // Devo backend
     AP_DEVO_Telem devo_telemetry;
@@ -1025,9 +1025,6 @@ private:
 
     // queue of outgoing statustext messages
     ObjectArray<statustext_t> _statustext_queue{_status_capacity};
-
-    // true if we are running short on time in our main loop
-    bool _out_of_time;
 
     // true if we have already allocated protocol objects:
     bool initialised_missionitemprotocol_objects;

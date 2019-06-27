@@ -977,8 +977,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.set_parameter("BTN_ENABLE", 1)
         btn = 2
         pin = 3
-        self.set_parameter("BTN_PIN%u" % btn, pin)
         self.drain_mav()
+        self.set_parameter("BTN_PIN%u" % btn, pin)
         m = self.mav.recv_match(type='BUTTON_CHANGE', blocking=True, timeout=1)
         self.progress("m: %s" % str(m))
         if m is None:
@@ -1158,7 +1158,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                                        (m.target_component, mav.mav.srcComponent))
         return m
 
-    def clear_mission(self, mission_type, target_system, target_component):
+    def send_clear_mission(self, mission_type, target_system, target_component):
         self.mav.mav.mission_count_send(target_system,
                                         target_component,
                                         0,
@@ -1537,9 +1537,9 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
 
             self.start_subtest("Test write-partial-list")
             self.progress("Clearing rally points using count-send")
-            self.clear_mission(mavutil.mavlink.MAV_MISSION_TYPE_RALLY,
-                               target_system,
-                               target_component)
+            self.send_clear_mission(mavutil.mavlink.MAV_MISSION_TYPE_RALLY,
+                                    target_system,
+                                    target_component)
             self.progress("Should not be able to set items completely past the waypoint count")
             self.upload_using_mission_protocol(mavutil.mavlink.MAV_MISSION_TYPE_RALLY,
                                                items)

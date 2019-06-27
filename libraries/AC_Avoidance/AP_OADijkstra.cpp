@@ -16,14 +16,14 @@
 #include "AP_OADijkstra.h"
 #include <AC_Fence/AC_Fence.h>
 
-#define OA_DIJKSTRA_POLYGON_VISGRAPH_PTS         (OA_DIJKSTRA_POLYGON_FENCE_PTS * OA_DIJKSTRA_POLYGON_FENCE_PTS / 2)
-#define OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX 255     // index use to indicate we do not have a tentative short path for a node
+#define OA_DIJKSTRA_EXPANDING_ARRAY_ELEMENTS_PER_CHUNK  32      // expanding arrays for inner polygon fence and paths to destination will grow in increments of 20 elements
+#define OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX        255     // index use to indicate we do not have a tentative short path for a node
 
 /// Constructor
 AP_OADijkstra::AP_OADijkstra() :
-        _polyfence_visgraph(OA_DIJKSTRA_POLYGON_VISGRAPH_PTS),
-        _source_visgraph(OA_DIJKSTRA_POLYGON_FENCE_PTS),
-        _destination_visgraph(OA_DIJKSTRA_POLYGON_FENCE_PTS)
+        _polyfence_pts(OA_DIJKSTRA_EXPANDING_ARRAY_ELEMENTS_PER_CHUNK),
+        _short_path_data(OA_DIJKSTRA_EXPANDING_ARRAY_ELEMENTS_PER_CHUNK),
+        _path(OA_DIJKSTRA_EXPANDING_ARRAY_ELEMENTS_PER_CHUNK)
 {
 }
 
@@ -153,8 +153,8 @@ bool AP_OADijkstra::create_polygon_fence_with_margin(float margin_cm)
         return false;
     }
 
-    // fail if fence is too large
-    if (num_points > OA_DIJKSTRA_POLYGON_FENCE_PTS) {
+    // expand fence point array if required
+    if (!_polyfence_pts.expand_to_hold(num_points)) {
         return false;
     }
 
@@ -226,13 +226,18 @@ bool AP_OADijkstra::create_polygon_fence_visgraph()
         return false;
     }
 
+    // fail if more than number of polygon points algorithm can handle
+    if (num_points >= OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX) {
+        return false;
+    }
+
     // clear polygon visibility graph
     _polyfence_visgraph.clear();
 
     // calculate distance from each polygon fence point to all other points
     for (uint8_t i=0; i<_polyfence_numpoints-1; i++) {
         const Vector2f &start1 = _polyfence_pts[i];
-        for (uint8_t j=i+1; j<_polyfence_numpoints-1; j++) {
+        for (uint8_t j=i+1; j<_polyfence_numpoints; j++) {
             const Vector2f &end1 = _polyfence_pts[j];
             Vector2f intersection;
             // ToDo: calculation below could be sped up by removing unused intersection and
@@ -277,8 +282,8 @@ bool AP_OADijkstra::update_visgraph(AP_OAVisGraph& visgraph, const AP_OAVisGraph
     // clear visibility graph
     visgraph.clear();
 
-    // calculate distance from position to all fence points
-    for (uint8_t i=0; i<_polyfence_numpoints-1; i++) {
+    // calculate distance from extra_position to all fence points
+    for (uint8_t i=0; i<_polyfence_numpoints; i++) {
         Vector2f intersection;
         if (!Polygon_intersects(boundary, num_points, position, _polyfence_pts[i], intersection)) {
             // line segment does not intersect with original fence so add to visgraph
@@ -413,8 +418,10 @@ bool AP_OADijkstra::calc_shortest_path(const Location &origin, const Location &d
     update_visgraph(_source_visgraph, {AP_OAVisGraph::OATYPE_SOURCE, 0}, origin_NE, true, destination_NE);
     update_visgraph(_destination_visgraph, {AP_OAVisGraph::OATYPE_DESTINATION, 0}, destination_NE);
 
-    // check OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX is defined correct
-    static_assert(OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX > OA_DIJKSTRA_POLYGON_FENCE_PTS, "check OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX > OA_DIJKSTRA_POLYGON_FENCE_PTS");
+    // expand _short_path_data if necessary
+    if (!_short_path_data.expand_to_hold(2 + _polyfence_numpoints)) {
+        return false;
+    }
 
     // add origin and destination (node_type, id, visited, distance_from_idx, distance_cm) to short_path_data array
     _short_path_data[0] = {{AP_OAVisGraph::OATYPE_SOURCE, 0}, false, 0, 0};
@@ -422,8 +429,7 @@ bool AP_OADijkstra::calc_shortest_path(const Location &origin, const Location &d
     _short_path_data_numpoints = 2;
 
     // add fence points to short_path_data array (node_type, id, visited, distance_from_idx, distance_cm)
-    // skip last fence point because it is the same as the first
-    for (uint8_t i=0; i<_polyfence_numpoints-1; i++) {
+    for (uint8_t i=0; i<_polyfence_numpoints; i++) {
         _short_path_data[_short_path_data_numpoints++] = {{AP_OAVisGraph::OATYPE_FENCE_POINT, i}, false, OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX, FLT_MAX};
     }
 
@@ -460,9 +466,14 @@ bool AP_OADijkstra::calc_shortest_path(const Location &origin, const Location &d
     }
     _path_numpoints = 0;
     while (true) {
-        // fail if out of space or newest node has invalid distance or from index
-        if ((_path_numpoints >= OA_DIJKSTRA_POLYGON_SHORTPATH_PTS) ||
-            (_short_path_data[nidx].distance_from_idx == OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX) ||
+        // fail if out of space
+        if (_path_numpoints >= _path.max_items()) {
+            if (!_path.expand()) {
+                break;
+            }
+        }
+        // fail if newest node has invalid distance_from_index
+        if ((_short_path_data[nidx].distance_from_idx == OA_DIJKSTRA_POLYGON_SHORTPATH_NOTSET_IDX) ||
             (_short_path_data[nidx].distance_cm >= FLT_MAX)) {
             break;
         } else {
