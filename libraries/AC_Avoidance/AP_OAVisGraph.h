@@ -1,6 +1,7 @@
 #pragma once
 
 #include <AP_Common/AP_Common.h>
+#include <AP_Common/AP_ExpandingArray.h>
 #include <AP_HAL/AP_HAL.h>
 
 /*
@@ -9,7 +10,6 @@
 class AP_OAVisGraph {
 public:
     AP_OAVisGraph();
-    AP_OAVisGraph(uint8_t size);
 
     /* Do not allow copies */
     AP_OAVisGraph(const AP_OAVisGraph &other) = delete;
@@ -39,9 +39,6 @@ public:
         float distance_cm;  // distance between the items
     };
 
-    // initialise array to given size
-    bool init(uint8_t size);
-
     // clear all elements from graph
     void clear() { _num_items = 0; }
 
@@ -57,7 +54,6 @@ public:
 
 private:
 
-    VisGraphItem *_items;
-    uint8_t _num_items_max;
+    AP_ExpandingArray<VisGraphItem> _items;
     uint8_t _num_items;
 };

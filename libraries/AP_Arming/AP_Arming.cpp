@@ -27,6 +27,7 @@
 #include <AC_Fence/AC_Fence.h>
 #include <AP_InternalError/AP_InternalError.h>
 #include <AP_GPS/AP_GPS.h>
+#include <AP_Baro/AP_Baro.h>
 
 #if HAL_WITH_UAVCAN
   #include <AP_BoardConfig/AP_BoardConfig_CAN.h>
@@ -825,6 +826,7 @@ bool AP_Arming::arm(AP_Arming::Method method, const bool do_arming_checks)
         //Can't do this from this class until there is a unified logging library
 
     } else {
+        AP::logger().arming_failure();
         armed = false;
     }
 
