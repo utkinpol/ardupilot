@@ -245,8 +245,12 @@ void Vector3<T>::rotate(enum Rotation rotation)
         return;
     }
     case ROTATION_PITCH_45: {
-	x   = HALF_SQRT_2*(float)(x + z);
-        z   = HALF_SQRT_2*(float)(z - x);
+        const float sin_pitch = HALF_SQRT_2; // sinf(pitch);
+        const float cos_pitch = HALF_SQRT_2; // cosf(pitch);
+        float tmpx = x;
+        float tmpz = z;
+        x =  cos_pitch * tmpx + sin_pitch * tmpz;
+        z = -sin_pitch * tmpx + cos_pitch * tmpz;
         return;
     }
 //    case ROTATION_PITCH_7: {
