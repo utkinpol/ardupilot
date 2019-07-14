@@ -169,6 +169,7 @@ class AutoTest(ABC):
                  params=None,
                  gdbserver=False,
                  breakpoints=[],
+                 disable_breakpoints=False,
                  viewerip=None,
                  use_map=False,
                  _show_test_timings=False):
@@ -180,6 +181,7 @@ class AutoTest(ABC):
         self.params = params
         self.gdbserver = gdbserver
         self.breakpoints = breakpoints
+        self.disable_breakpoints = disable_breakpoints
         self.speedup = speedup
 
         self.mavproxy = None
@@ -247,7 +249,8 @@ class AutoTest(ABC):
         """Returns options to be passed to MAVProxy."""
         ret = ['--sitl=127.0.0.1:5501',
                '--out=' + self.autotest_connection_string_from_mavproxy(),
-               '--streamrate=%u' % self.sitl_streamrate()]
+               '--streamrate=%u' % self.sitl_streamrate(),
+               '--cmd="set heartbeat %u"' % self.speedup]
         if self.viewerip:
             ret.append("--out=%s:14550" % self.viewerip)
         if self.use_map:
@@ -2007,6 +2010,7 @@ class AutoTest(ABC):
         self.progress("Starting simulator")
         self.sitl = util.start_SITL(self.binary,
                                     breakpoints=self.breakpoints,
+                                    disable_breakpoints=self.disable_breakpoints,
                                     defaults_file=self.defaults_filepath(),
                                     gdb=self.gdb,
                                     gdbserver=self.gdbserver,

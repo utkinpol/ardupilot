@@ -138,6 +138,10 @@ void AP_Logger::Write_GPS(uint8_t i, uint64_t time_us)
         time_us = AP_HAL::micros64();
     }
     const struct Location &loc = gps.location(i);
+
+    float yaw_deg=0, yaw_accuracy_deg=0;
+    gps.gps_yaw_deg(i, yaw_deg, yaw_accuracy_deg);
+
     struct log_GPS pkt = {
         LOG_PACKET_HEADER_INIT((uint8_t)(LOG_GPS_MSG+i)),
         time_us       : time_us,
@@ -152,6 +156,7 @@ void AP_Logger::Write_GPS(uint8_t i, uint64_t time_us)
         ground_speed  : gps.ground_speed(i),
         ground_course : gps.ground_course(i),
         vel_z         : gps.velocity(i).z,
+        yaw           : yaw_deg,
         used          : (uint8_t)(gps.primary_sensor() == i)
     };
     WriteBlock(&pkt, sizeof(pkt));
@@ -635,14 +640,25 @@ void AP_Logger::Write_Current_instance(const uint64_t time_us,
     AP_BattMonitor &battery = AP::battery();
     float temp;
     bool has_temp = battery.get_temperature(temp, battery_instance);
+    float current, consumed_mah, consumed_wh;
+    if (!battery.current_amps(current)) {
+        current = quiet_nanf();
+    }
+    if (!battery.consumed_mah(consumed_mah, battery_instance)) {
+        consumed_mah = quiet_nanf();
+    }
+    if (!battery.consumed_wh(consumed_wh, battery_instance)) {
+        consumed_wh = quiet_nanf();
+    }
+
     struct log_Current pkt = {
         LOG_PACKET_HEADER_INIT(type),
         time_us             : time_us,
         voltage             : battery.voltage(battery_instance),
         voltage_resting     : battery.voltage_resting_estimate(battery_instance),
-        current_amps        : battery.current_amps(battery_instance),
-        current_total       : battery.consumed_mah(battery_instance),
-        consumed_wh         : battery.consumed_wh(battery_instance),
+        current_amps        : current,
+        current_total       : consumed_mah,
+        consumed_wh         : consumed_wh,
         temperature         : (int16_t)(has_temp ? (temp * 100) : 0),
         resistance          : battery.get_resistance(battery_instance)
     };
