@@ -395,6 +395,7 @@ void NavEKF3_core::checkAttitudeAlignmentStatus()
     if (!yawAlignComplete && tiltAlignComplete && use_compass()) {
             magYawResetRequest = true;
     }
+
 }
 
 // return true if we should use the airspeed sensor
@@ -449,7 +450,7 @@ bool NavEKF3_core::readyToUseRangeBeacon(void) const
 // return true if we should use the compass
 bool NavEKF3_core::use_compass(void) const
 {
-    return _ahrs->get_compass() && _ahrs->get_compass()->use_for_yaw(magSelectIndex) && !allMagSensorsFailed;
+    return (frontend->_magCal != 5) && _ahrs->get_compass() && _ahrs->get_compass()->use_for_yaw(magSelectIndex) && !allMagSensorsFailed;
 }
 
 /*
