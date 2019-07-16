@@ -537,6 +537,8 @@ class AutoTest(ABC):
     def log_download(self, filename, timeout=360, upload_logs=False):
         """Download latest log."""
         self.wait_heartbeat()
+        self.mavproxy.send("module load log\n")
+        self.mavproxy.expect("Loaded module log")
         self.mavproxy.send("log list\n")
         self.mavproxy.expect("numLogs")
         self.wait_heartbeat()
@@ -1457,6 +1459,25 @@ class AutoTest(ABC):
             if m.heading == int(heading):
                 return
 
+    def do_set_relay(self, relay_num, on_off, timeout=10):
+        """Set relay with a command long message."""
+        self.progress("Set relay %d to %d" % (relay_num, on_off))
+        self.run_cmd(mavutil.mavlink.MAV_CMD_DO_SET_RELAY,
+                     relay_num,
+                     on_off,
+                     0,
+                     0,
+                     0,
+                     0,
+                     0,
+                     timeout=timeout)
+
+    def do_set_relay_mavproxy(self, relay_num, on_off):
+        """Set relay with mavproxy."""
+        self.progress("Set relay %d to %d" % (relay_num, on_off))
+        self.mavproxy.send('module load relay\n')
+        self.mavproxy.expect("Loaded module relay")
+        self.mavproxy.send("relay set %d %d\n" % (relay_num, on_off))
     #################################################
     # WAIT UTILITIES
     #################################################
@@ -2337,6 +2358,8 @@ class AutoTest(ABC):
             self.progress("Exception (%s) caught" % str(e))
             ex = e
         self.context_pop()
+        self.mavproxy.send("module unload dataflash_logger\n")
+        self.mavproxy.expect("Unloaded module dataflash_logger")
         self.reboot_sitl()
         if ex is not None:
             raise ex
@@ -2913,9 +2936,14 @@ switch value'''
 
     def last_onboard_log(self):
         '''return number of last onboard log'''
+        self.mavproxy.send("module load log\n")
+        self.mavproxy.expect("Loaded module log")
         self.mavproxy.send("log list\n")
         self.mavproxy.expect("lastLog ([0-9]+)")
-        return int(self.mavproxy.match.group(1))
+        num_log = int(self.mavproxy.match.group(1))
+        self.mavproxy.send("module unload log\n")
+        self.mavproxy.expect("Unloaded module log")
+        return num_log
 
     def current_onboard_log_filepath(self):
         '''return filepath to currently open dataflash log'''

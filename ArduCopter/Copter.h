@@ -277,7 +277,7 @@ private:
     Compass compass;
     AP_InertialSensor ins;
 
-    RangeFinder rangefinder{serial_manager};
+    RangeFinder rangefinder;
     struct {
         bool enabled:1;
         bool alt_healthy:1; // true if we can trust the altitude from the rangefinder
@@ -545,7 +545,7 @@ private:
     AP_ADSB adsb;
 
     // avoidance of adsb enabled vehicles (normally manned vehicles)
-    AP_Avoidance_Copter avoidance_adsb{ahrs, adsb};
+    AP_Avoidance_Copter avoidance_adsb{adsb};
 #endif
 
     // last valid RC input time

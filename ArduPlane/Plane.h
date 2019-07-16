@@ -222,7 +222,7 @@ private:
 
     AP_InertialSensor ins;
 
-    RangeFinder rangefinder{serial_manager};
+    RangeFinder rangefinder;
 
     AP_Vehicle::FixedWing::Rangefinder_State rangefinder_state;
 
@@ -673,7 +673,7 @@ private:
     AP_ADSB adsb;
 
     // avoidance of adsb enabled vehicles (normally manned vheicles)
-    AP_Avoidance_Plane avoidance_adsb{ahrs, adsb};
+    AP_Avoidance_Plane avoidance_adsb{adsb};
 
     // Outback Challenge Failsafe Support
 #if ADVANCED_FAILSAFE == ENABLED
