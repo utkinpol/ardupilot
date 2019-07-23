@@ -189,12 +189,12 @@ void ModeAuto::takeoff_start(const Location& dest_loc)
 }
 
 // auto_wp_start - initialises waypoint controller to implement flying to a particular destination
-void ModeAuto::wp_start(const Vector3f& destination)
+void ModeAuto::wp_start(const Vector3f& destination, bool terrain_alt)
 {
     _mode = Auto_WP;
 
     // initialise wpnav (no need to check return status because terrain data is not used)
-    wp_nav->set_wp_destination(destination, false);
+    wp_nav->set_wp_destination(destination, terrain_alt);
 
     // initialise yaw
     // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
@@ -741,7 +741,7 @@ void ModeAuto::takeoff_run()
     auto_takeoff_run();
     if (wp_nav->reached_wp_destination()) {
         const Vector3f target = wp_nav->get_wp_destination();
-        wp_start(target);
+        wp_start(target, wp_nav->origin_and_destination_are_terrain_alt());
     }
 }
 
@@ -833,6 +833,7 @@ void ModeAuto::land_run()
     // if not armed set throttle to zero and exit immediately
     if (is_disarmed_or_landed()) {
         make_safe_spool_down();
+        loiter_nav->clear_pilot_desired_acceleration();
         loiter_nav->init_target();
         return;
     }
@@ -928,6 +929,7 @@ void ModeAuto::loiter_to_alt_run()
     }
 
     if (!loiter_to_alt.loiter_start_done) {
+        loiter_nav->clear_pilot_desired_acceleration();
         loiter_nav->init_target();
         _mode = Auto_LoiterToAlt;
         loiter_to_alt.loiter_start_done = true;

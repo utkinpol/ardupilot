@@ -31,6 +31,13 @@ singleton AP_AHRS method get_relative_position_NED_home boolean Vector3f'Null
 singleton AP_AHRS method home_is_set boolean
 singleton AP_AHRS method prearm_healthy boolean
 
+include AP_Arming/AP_Arming.h
+
+singleton AP_Arming alias arming
+singleton AP_Arming method disarm boolean
+singleton AP_Arming method is_armed boolean
+singleton AP_Arming method arm boolean AP_Arming::Method::SCRIPTING'literal
+
 include AP_BattMonitor/AP_BattMonitor.h
 
 singleton AP_BattMonitor alias battery
@@ -50,6 +57,7 @@ singleton AP_BattMonitor method get_temperature boolean float'Null uint8_t 0 ud-
 include AP_GPS/AP_GPS.h
 
 singleton AP_GPS alias gps
+singleton AP_GPS enum NO_GPS NO_FIX GPS_OK_FIX_2D GPS_OK_FIX_3D GPS_OK_FIX_3D_DGPS GPS_OK_FIX_3D_RTK_FLOAT GPS_OK_FIX_3D_RTK_FIXED
 singleton AP_GPS method num_sensors uint8_t
 singleton AP_GPS method primary_sensor uint8_t
 singleton AP_GPS method status uint8_t uint8_t 0 ud->num_sensors()
