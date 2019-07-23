@@ -9,6 +9,7 @@
 
 char keyword_alias[]     = "alias";
 char keyword_comment[]   = "--";
+char keyword_enum[]      = "enum";
 char keyword_field[]     = "field";
 char keyword_include[]   = "include";
 char keyword_method[]    = "method";
@@ -20,8 +21,9 @@ char keyword_userdata[]  = "userdata";
 char keyword_write[]     = "write";
 
 // attributes (should include the leading ' )
-char keyword_attr_enum[] = "'enum";
-char keyword_attr_null[] = "'Null";
+char keyword_attr_enum[]    = "'enum";
+char keyword_attr_literal[] = "'literal";
+char keyword_attr_null[]    = "'Null";
 
 // type keywords
 char keyword_boolean[]  = "boolean";
@@ -90,6 +92,7 @@ enum field_type {
   TYPE_NONE,
   TYPE_STRING,
   TYPE_ENUM,
+  TYPE_LITERAL,
   TYPE_USERDATA,
 };
 
@@ -139,6 +142,7 @@ struct type {
   union {
     char *userdata_name;
     char *enum_name;
+    char *literal;
   } data;
 };
 
@@ -287,12 +291,18 @@ enum userdata_flags {
   UD_FLAG_SEMAPHORE = (1U << 0),
 };
 
+struct userdata_enum {
+  struct userdata_enum * next;
+  char * name;     // enum name
+};
+
 struct userdata {
   struct userdata * next;
   char *name;  // name of the C++ singleton
   char *alias; // (optional) used for scripting access
   struct userdata_field *fields;
   struct method *methods;
+  struct userdata_enum *enums;
   enum userdata_type ud_type;
   uint32_t operations; // bitset of enum operation_types
   int flags; // flags from the userdata_flags enum
@@ -356,6 +366,7 @@ unsigned int parse_access_flags(struct type * type) {
         case TYPE_USERDATA:
         case TYPE_BOOLEAN:
         case TYPE_STRING:
+        case TYPE_LITERAL:
           // a range check is illogical
           break;
         case TYPE_NONE:
@@ -412,6 +423,8 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
   if (attribute != NULL) {
     if (strcmp(attribute, keyword_attr_enum) == 0) {
       type->flags |= TYPE_FLAGS_ENUM;
+    } else if (strcmp(attribute, keyword_attr_literal) == 0) {
+      type->type = TYPE_LITERAL;
     } else if (strcmp(attribute, keyword_attr_null) == 0) {
       if (restrictions & TYPE_RESTRICTION_NOT_NULLABLE) {
         error(ERROR_USERDATA, "%s is not nullable in this context", data_type);
@@ -446,6 +459,8 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
   } else if (type->flags & TYPE_FLAGS_ENUM) {
     type->type = TYPE_ENUM;
     string_copy(&(type->data.enum_name), data_type);
+  } else if (type->type == TYPE_LITERAL) {
+      string_copy(&(type->data.literal), data_type);
   } else {
     // assume that this is a user data, we can't validate this until later though
     type->type = TYPE_USERDATA;
@@ -468,6 +483,7 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
       case TYPE_ENUM:
       case TYPE_USERDATA:
         break;
+      case TYPE_LITERAL:
       case TYPE_NONE:
         error(ERROR_USERDATA, "%s types cannot be nullable", data_type);
         break;
@@ -491,11 +507,25 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
       case TYPE_NONE:
       case TYPE_STRING:
       case TYPE_USERDATA:
+      case TYPE_LITERAL:
         // no sane range checks, so we can ignore this
         break;
     }
   }
   return TRUE;
+}
+
+void handle_userdata_enum(struct userdata *data) {
+  trace(TRACE_USERDATA, "Adding a userdata enum");
+
+  char * enum_name;
+  while ((enum_name = next_token()) != NULL) {
+    trace(TRACE_USERDATA, "Adding enum %s", enum_name);
+    struct userdata_enum *ud_enum = (struct userdata_enum *) allocate(sizeof(struct userdata_enum));
+    ud_enum->next = data->enums;
+    string_copy(&(ud_enum->name), enum_name);
+    data->enums = ud_enum;
+  }
 }
 
 void handle_userdata_field(struct userdata *data) {
@@ -658,6 +688,8 @@ void handle_userdata(void) {
     handle_operator(node);
   } else if (strcmp(type, keyword_method) == 0) {
     handle_method(node->name, &(node->methods));
+  } else if (strcmp(type, keyword_enum) == 0) {
+    handle_userdata_enum(node);
   } else {
     error(ERROR_USERDATA, "Unknown or unsupported type for userdata: %s", type);
   }
@@ -710,6 +742,8 @@ void handle_singleton(void) {
     node->flags |= UD_FLAG_SEMAPHORE;
   } else if (strcmp(type, keyword_method) == 0) {
     handle_method(node->name, &(node->methods));
+  } else if (strcmp(type, keyword_enum) == 0) {
+    handle_userdata_enum(node);
   } else {
     error(ERROR_SINGLETON, "Singletons only support aliases, methods or semaphore keyowrds (got %s)", type);
   }
@@ -810,6 +844,7 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
         fprintf(source, "%suint32_t data_%d = {};\n", indentation, arg_number);
         break;
       case TYPE_NONE:
+      case TYPE_LITERAL:
         return; // nothing to do here, this should potentially be checked outside of this, but it makes an easier implementation to accept it
       case TYPE_STRING:
         fprintf(source, "%schar * data_%d = {};\n", indentation, arg_number);
@@ -868,6 +903,7 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
       case TYPE_STRING:
       case TYPE_BOOLEAN:
       case TYPE_USERDATA:
+      case TYPE_LITERAL:
         // these don't get range checked, so skip the raw_data phase
         assert(t.range == NULL); // we should have caught this during the parse phase
         break;
@@ -893,6 +929,7 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
       case TYPE_STRING:
       case TYPE_BOOLEAN:
       case TYPE_USERDATA:
+      case TYPE_LITERAL:
         // these don't get range checked, so skip the raw_data phase
         assert(t.range == NULL); // we should have caught this during the parse phase
         break;
@@ -907,11 +944,37 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
                 arg_number, t.range->high, forced_max,
                 arg_number, name);
        } else {
-        fprintf(source, "%sluaL_argcheck(L, ((raw_data_%d >= %s) && (raw_data_%d <= %s)), %d, \"%s out of range\");\n",
-                indentation,
-                arg_number, t.range->low,
-                arg_number, t.range->high,
-                arg_number, name);
+         char * cast_target = "";
+
+         switch (t.type) {
+           case TYPE_FLOAT:
+             cast_target = "float";
+             break;
+           case TYPE_INT8_T:
+           case TYPE_INT16_T:
+           case TYPE_INT32_T:
+           case TYPE_UINT8_T:
+           case TYPE_UINT16_T:
+           case TYPE_ENUM:
+             cast_target = "int32_t";
+             break;
+           case TYPE_UINT32_T:
+             cast_target = "uint32_t";
+             break;
+           case TYPE_NONE:
+           case TYPE_STRING:
+           case TYPE_BOOLEAN:
+           case TYPE_USERDATA:
+           case TYPE_LITERAL:
+             assert(t.range == NULL); // we should have caught this during the parse phase
+             break;
+         }
+
+         fprintf(source, "%sluaL_argcheck(L, ((raw_data_%d >= static_cast<%s>(%s)) && (raw_data_%d <= static_cast<%s>(%s))), %d, \"%s out of range\");\n",
+                 indentation,
+                 arg_number, cast_target, t.range->low,
+                 arg_number, cast_target, t.range->high,
+                 arg_number, name);
        }
     }
 
@@ -951,6 +1014,9 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
       case TYPE_USERDATA:
         fprintf(source, "%s%s & data_%d = *check_%s(L, %d);\n", indentation, t.data.userdata_name, arg_number, t.data.userdata_name, arg_number);
         break;
+      case TYPE_LITERAL:
+        // literals are expected to be done directly later
+        break;
       case TYPE_NONE:
         // nothing to do, we've either already emitted a reasonable value, or returned
         break;
@@ -986,6 +1052,9 @@ void emit_userdata_field(const struct userdata *data, const struct userdata_fiel
         break;
       case TYPE_NONE:
         error(ERROR_INTERNAL, "Can't access a NONE field");
+        break;
+      case TYPE_LITERAL:
+        error(ERROR_INTERNAL, "Can't access a literal field");
         break;
       case TYPE_STRING:
         fprintf(source, "            lua_pushstring(L, ud->%s);\n", field->name);
@@ -1043,7 +1112,7 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
   // sanity check number of args called with
   arg_count = 1;
   while (arg != NULL) {
-    if (!(arg->type.flags & TYPE_FLAGS_NULLABLE)) {
+    if (!(arg->type.flags & TYPE_FLAGS_NULLABLE) && !(arg->type.type == TYPE_LITERAL)) {
       arg_count++;
     }
     arg = arg->next;
@@ -1111,12 +1180,35 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
     case TYPE_NONE:
       fprintf(source, "    ud->%s(\n", method->name);
       break;
+    case TYPE_LITERAL:
+      error(ERROR_USERDATA, "Can't return a literal from a method");
+      break;
   }
 
   arg = method->arguments;
   arg_count = 2;
   while (arg != NULL) {
-    fprintf(source, "            data_%d", arg_count + ((arg->type.flags & TYPE_FLAGS_NULLABLE) ? NULLABLE_ARG_COUNT_BASE : 0));
+    switch (arg->type.type) {
+      case TYPE_BOOLEAN:
+      case TYPE_FLOAT:
+      case TYPE_INT8_T:
+      case TYPE_INT16_T:
+      case TYPE_INT32_T:
+      case TYPE_STRING:
+      case TYPE_UINT8_T:
+      case TYPE_UINT16_T:
+      case TYPE_UINT32_T:
+      case TYPE_ENUM:
+      case TYPE_USERDATA:
+        fprintf(source, "            data_%d", arg_count + ((arg->type.flags & TYPE_FLAGS_NULLABLE) ? NULLABLE_ARG_COUNT_BASE : 0));
+        break;
+      case TYPE_LITERAL:
+        fprintf(source, "            %s", arg->type.data.literal);
+        break;
+      case TYPE_NONE:
+        error(ERROR_INTERNAL, "Can't pass nil as an argument");
+        break;
+    }
     arg = arg->next;
     if (arg != NULL) {
             fprintf(source, ",\n");
@@ -1171,6 +1263,9 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
               case TYPE_NONE:
                 error(ERROR_INTERNAL, "Attempted to emit a nullable argument of type none");
                 break;
+              case TYPE_LITERAL:
+                error(ERROR_INTERNAL, "Attempted to make a nullable literal");
+                break;
             }
           }
 
@@ -1208,6 +1303,7 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
       fprintf(source, "    *check_%s(L, -1) = data;\n", method->return_type.data.userdata_name);
       break;
     case TYPE_NONE:
+    case TYPE_LITERAL:
       // no return value, so don't worry about pushing a value
       return_count = 0;
       break;
@@ -1336,7 +1432,7 @@ void emit_singleton_metatables(void) {
     fprintf(source, "const luaL_Reg %s_meta[] = {\n", node->name);
 
     struct method *method = node->methods;
-    while(method) {
+    while (method) {
       fprintf(source, "    {\"%s\", %s_%s},\n", method->name, node->name, method->name);
       method = method->next;
     }
@@ -1348,28 +1444,51 @@ void emit_singleton_metatables(void) {
   }
 }
 
-void emit_loaders(void) {
-  fprintf(source, "const struct userdata_fun {\n");
-  fprintf(source, "    const char *name;\n");
-  fprintf(source, "    const luaL_Reg *reg;\n");
-  fprintf(source, "} userdata_fun[] = {\n");
-  struct userdata * data = parsed_userdata;
+void emit_enums(struct userdata * data) {
   while (data) {
-    fprintf(source, "    {\"%s\", %s_meta},\n", data->name, data->name);
+    if (data->enums != NULL) {
+      fprintf(source, "struct userdata_enum %s_enums[] = {\n", data->name);
+      struct userdata_enum *ud_enum = data->enums;
+      while (ud_enum != NULL) {
+        fprintf(source, "    {\"%s\", %s::%s},\n", ud_enum->name, data->name, ud_enum->name);
+        ud_enum = ud_enum->next;
+      }
+      fprintf(source, "    {NULL, 0}};\n\n");
+    }
+    data = data->next;
+  }
+}
+
+void emit_metas(struct userdata * data, char * meta_name) {
+  fprintf(source, "const struct userdata_meta %s_fun[] = {\n", meta_name);
+  while (data) {
+    if (data->enums) {
+      fprintf(source, "    {\"%s\", %s_meta, %s_enums},\n", data->alias ? data->alias : data->name, data->name, data->name);
+    } else {
+      fprintf(source, "    {\"%s\", %s_meta, NULL},\n", data->alias ? data->alias : data->name, data->name);
+    }
     data = data->next;
   }
   fprintf(source, "};\n\n");
+}
 
-  fprintf(source, "const struct singleton_fun {\n");
+void emit_loaders(void) {
+  // emit the enum header
+  fprintf(source, "struct userdata_enum {\n");
+  fprintf(source, "    const char *name;\n");
+  fprintf(source, "    int value;\n");
+  fprintf(source, "};\n\n");
+  emit_enums(parsed_userdata);
+  emit_enums(parsed_singletons);
+
+  // emit the meta table header
+  fprintf(source, "struct userdata_meta {\n");
   fprintf(source, "    const char *name;\n");
   fprintf(source, "    const luaL_Reg *reg;\n");
-  fprintf(source, "} singleton_fun[] = {\n");
-  struct userdata * single = parsed_singletons;
-  while (single) {
-    fprintf(source, "    {\"%s\", %s_meta},\n", single->alias ? single->alias : single->name, single->name);
-    single = single->next;
-  }
+  fprintf(source, "    const struct userdata_enum *enums;\n");
   fprintf(source, "};\n\n");
+  emit_metas(parsed_userdata, "userdata");
+  emit_metas(parsed_singletons, "singleton");
 
   fprintf(source, "void load_generated_bindings(lua_State *L) {\n");
   fprintf(source, "    luaL_checkstack(L, 5, \"Out of stack\");\n"); // this is more stack space then we need, but should never fail
@@ -1391,6 +1510,17 @@ void emit_loaders(void) {
   fprintf(source, "        lua_pushstring(L, \"__index\");\n");
   fprintf(source, "        lua_pushvalue(L, -2);\n");
   fprintf(source, "        lua_settable(L, -3);\n");
+
+  fprintf(source, "        if (singleton_fun[i].enums != nullptr) {\n");
+  fprintf(source, "            int j = 0;\n");
+  fprintf(source, "            while (singleton_fun[i].enums[j].name != NULL) {\n");
+  fprintf(source, "                lua_pushstring(L, singleton_fun[i].enums[j].name);\n");
+  fprintf(source, "                lua_pushinteger(L, singleton_fun[i].enums[j].value);\n");
+  fprintf(source, "                lua_settable(L, -3);\n");
+  fprintf(source, "                j++;\n");
+  fprintf(source, "            }\n");
+  fprintf(source, "        }\n");
+
   fprintf(source, "        lua_pop(L, 1);\n");
   fprintf(source, "        lua_newuserdata(L, 0);\n");
   fprintf(source, "        luaL_getmetatable(L, singleton_fun[i].name);\n");
