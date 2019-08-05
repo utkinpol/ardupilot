@@ -812,7 +812,7 @@ bool GCS_MAVLINK::set_mavlink_message_id_interval(const uint32_t mavlink_id,
 {
     const ap_message id = mavlink_id_to_ap_message_id(mavlink_id);
     if (id == MSG_LAST) {
-        gcs().send_text(MAV_SEVERITY_INFO, "No ap_message for mavlink id (%u)", mavlink_id);
+        gcs().send_text(MAV_SEVERITY_INFO, "No ap_message for mavlink id (%u)", (unsigned int)mavlink_id);
         return false;
     }
     return set_ap_message_interval(id, interval_ms);
@@ -3141,7 +3141,7 @@ void GCS_MAVLINK::send_banner()
     // mark the firmware version in the tlog
     const AP_FWVersion &fwver = AP::fwversion();
 
-    send_text(MAV_SEVERITY_INFO, fwver.fw_string);
+    send_text(MAV_SEVERITY_INFO, "%s", fwver.fw_string);
 
     if (fwver.middleware_name && fwver.os_name) {
         send_text(MAV_SEVERITY_INFO, "%s: %s %s: %s",
@@ -3155,7 +3155,7 @@ void GCS_MAVLINK::send_banner()
     // send system ID if we can
     char sysid[40];
     if (hal.util->get_system_id(sysid)) {
-        send_text(MAV_SEVERITY_INFO, sysid);
+        send_text(MAV_SEVERITY_INFO, "%s", sysid);
     }
 }
 
@@ -3674,7 +3674,7 @@ MAV_RESULT GCS_MAVLINK::handle_command_int_do_set_home(const mavlink_command_int
         return MAV_RESULT_FAILED;
     }
     Location::AltFrame frame;
-    if (!mavlink_coordinate_frame_to_location_alt_frame(packet.frame, frame)) {
+    if (!mavlink_coordinate_frame_to_location_alt_frame((MAV_FRAME)packet.frame, frame)) {
         // unknown coordinate frame
         return MAV_RESULT_UNSUPPORTED;
     }
@@ -3755,26 +3755,6 @@ void GCS_MAVLINK::handle_command_int(const mavlink_message_t &msg)
     mavlink_msg_command_ack_send(chan, packet.command, result);
 
     hal.util->persistent_data.last_mavlink_cmd = 0;
-}
-
-bool GCS_MAVLINK::try_send_compass_message(const enum ap_message id)
-{
-    Compass &compass = AP::compass();
-    bool ret = true;
-    switch (id) {
-    case MSG_MAG_CAL_PROGRESS:
-        compass.send_mag_cal_progress(chan);
-        ret = true;;
-        break;
-    case MSG_MAG_CAL_REPORT:
-        compass.send_mag_cal_report(chan);
-        ret = true;
-        break;
-    default:
-        ret = true;
-        break;
-    }
-    return ret;
 }
 
 void GCS::try_send_queued_message_for_type(MAV_MISSION_TYPE type) {
@@ -4053,8 +4033,10 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
         break;
 
     case MSG_MAG_CAL_PROGRESS:
+        ret = AP::compass().send_mag_cal_progress(*this);
+        break;
     case MSG_MAG_CAL_REPORT:
-        ret = try_send_compass_message(id);
+        ret = AP::compass().send_mag_cal_report(*this);
         break;
 
     case MSG_BATTERY_STATUS:
@@ -4520,7 +4502,7 @@ void GCS::passthru_timer(void)
     }
 }
 
-bool GCS_MAVLINK::mavlink_coordinate_frame_to_location_alt_frame(const uint8_t coordinate_frame, Location::AltFrame &frame)
+bool GCS_MAVLINK::mavlink_coordinate_frame_to_location_alt_frame(const MAV_FRAME coordinate_frame, Location::AltFrame &frame)
 {
     switch (coordinate_frame) {
     case MAV_FRAME_GLOBAL_RELATIVE_ALT: // solo shot manager incorrectly sends RELATIVE_ALT instead of RELATIVE_ALT_INT

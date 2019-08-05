@@ -262,35 +262,34 @@ static int Location_lat(lua_State *L) {
 static int Vector2f_is_zero(lua_State *L) {
     binding_argcheck(L, 1);
     Vector2f * ud = check_Vector2f(L, 1);
-    ud->is_zero(
-        );
+    const bool data = ud->is_zero();
 
-    return 0;
+    lua_pushboolean(L, data);
+    return 1;
 }
 
 static int Vector2f_is_inf(lua_State *L) {
     binding_argcheck(L, 1);
     Vector2f * ud = check_Vector2f(L, 1);
-    ud->is_inf(
-        );
+    const bool data = ud->is_inf();
 
-    return 0;
+    lua_pushboolean(L, data);
+    return 1;
 }
 
 static int Vector2f_is_nan(lua_State *L) {
     binding_argcheck(L, 1);
     Vector2f * ud = check_Vector2f(L, 1);
-    ud->is_nan(
-        );
+    const bool data = ud->is_nan();
 
-    return 0;
+    lua_pushboolean(L, data);
+    return 1;
 }
 
 static int Vector2f_normalize(lua_State *L) {
     binding_argcheck(L, 1);
     Vector2f * ud = check_Vector2f(L, 1);
-    ud->normalize(
-        );
+    ud->normalize();
 
     return 0;
 }
@@ -298,8 +297,7 @@ static int Vector2f_normalize(lua_State *L) {
 static int Vector2f_length(lua_State *L) {
     binding_argcheck(L, 1);
     Vector2f * ud = check_Vector2f(L, 1);
-    const float data = ud->length(
-        );
+    const float data = ud->length();
 
     lua_pushnumber(L, data);
     return 1;
@@ -326,35 +324,34 @@ static int Vector2f___sub(lua_State *L) {
 static int Vector3f_is_zero(lua_State *L) {
     binding_argcheck(L, 1);
     Vector3f * ud = check_Vector3f(L, 1);
-    ud->is_zero(
-        );
+    const bool data = ud->is_zero();
 
-    return 0;
+    lua_pushboolean(L, data);
+    return 1;
 }
 
 static int Vector3f_is_inf(lua_State *L) {
     binding_argcheck(L, 1);
     Vector3f * ud = check_Vector3f(L, 1);
-    ud->is_inf(
-        );
+    const bool data = ud->is_inf();
 
-    return 0;
+    lua_pushboolean(L, data);
+    return 1;
 }
 
 static int Vector3f_is_nan(lua_State *L) {
     binding_argcheck(L, 1);
     Vector3f * ud = check_Vector3f(L, 1);
-    ud->is_nan(
-        );
+    const bool data = ud->is_nan();
 
-    return 0;
+    lua_pushboolean(L, data);
+    return 1;
 }
 
 static int Vector3f_normalize(lua_State *L) {
     binding_argcheck(L, 1);
     Vector3f * ud = check_Vector3f(L, 1);
-    ud->normalize(
-        );
+    ud->normalize();
 
     return 0;
 }
@@ -362,8 +359,7 @@ static int Vector3f_normalize(lua_State *L) {
 static int Vector3f_length(lua_State *L) {
     binding_argcheck(L, 1);
     Vector3f * ud = check_Vector3f(L, 1);
-    const float data = ud->length(
-        );
+    const float data = ud->length();
 
     lua_pushnumber(L, data);
     return 1;
@@ -483,6 +479,7 @@ static int GCS_send_text(lua_State *L) {
     const char * data_3 = luaL_checkstring(L, 3);
     ud->send_text(
             data_2,
+            "%s",
             data_3);
 
     return 0;
@@ -650,8 +647,7 @@ static int AP_Terrain_status(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const uint8_t data = ud->status(
-        );
+    const uint8_t data = ud->status();
 
     lua_pushinteger(L, data);
     return 1;
@@ -664,8 +660,7 @@ static int AP_Terrain_enabled(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const bool data = ud->enabled(
-        );
+    const bool data = ud->enabled();
 
     lua_pushboolean(L, data);
     return 1;
@@ -678,8 +673,7 @@ static int RangeFinder_num_sensors(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const uint8_t data = ud->num_sensors(
-        );
+    const uint8_t data = ud->num_sensors();
 
     lua_pushinteger(L, data);
     return 1;
@@ -706,24 +700,15 @@ static int AP_GPS_first_unconfigured_gps(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const uint8_t data = ud->first_unconfigured_gps(
-        );
+    uint8_t data_5002 = {};
+    const bool data = ud->first_unconfigured_gps(
+            data_5002);
 
-    lua_pushinteger(L, data);
-    return 1;
-}
-
-static int AP_GPS_all_configured(lua_State *L) {
-    AP_GPS * ud = AP_GPS::get_singleton();
-    if (ud == nullptr) {
-        return luaL_argerror(L, 1, "gps not supported on this firmware");
+    if (data) {
+        lua_pushinteger(L, data_5002);
+    } else {
+        lua_pushnil(L);
     }
-
-    binding_argcheck(L, 1);
-    const bool data = ud->all_configured(
-        );
-
-    lua_pushboolean(L, data);
     return 1;
 }
 
@@ -1047,8 +1032,7 @@ static int AP_GPS_primary_sensor(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const uint8_t data = ud->primary_sensor(
-        );
+    const uint8_t data = ud->primary_sensor();
 
     lua_pushinteger(L, data);
     return 1;
@@ -1061,8 +1045,7 @@ static int AP_GPS_num_sensors(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const uint8_t data = ud->num_sensors(
-        );
+    const uint8_t data = ud->num_sensors();
 
     lua_pushinteger(L, data);
     return 1;
@@ -1115,8 +1098,7 @@ static int AP_BattMonitor_has_failsafed(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const bool data = ud->has_failsafed(
-        );
+    const bool data = ud->has_failsafed();
 
     lua_pushboolean(L, data);
     return 1;
@@ -1283,8 +1265,7 @@ static int AP_BattMonitor_num_instances(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const uint8_t data = ud->num_instances(
-        );
+    const uint8_t data = ud->num_instances();
 
     lua_pushinteger(L, data);
     return 1;
@@ -1297,8 +1278,7 @@ static int AP_Arming_arm(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const bool data = ud->arm(
-            AP_Arming::Method::SCRIPTING);
+    const bool data = ud->arm(            AP_Arming::Method::SCRIPTING);
 
     lua_pushboolean(L, data);
     return 1;
@@ -1311,8 +1291,7 @@ static int AP_Arming_is_armed(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const bool data = ud->is_armed(
-        );
+    const bool data = ud->is_armed();
 
     lua_pushboolean(L, data);
     return 1;
@@ -1325,8 +1304,7 @@ static int AP_Arming_disarm(lua_State *L) {
     }
 
     binding_argcheck(L, 1);
-    const bool data = ud->disarm(
-        );
+    const bool data = ud->disarm();
 
     lua_pushboolean(L, data);
     return 1;
@@ -1340,8 +1318,7 @@ static int AP_AHRS_prearm_healthy(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const bool data = ud->prearm_healthy(
-        );
+    const bool data = ud->prearm_healthy();
 
     ud->get_semaphore().give();
     lua_pushboolean(L, data);
@@ -1356,8 +1333,7 @@ static int AP_AHRS_home_is_set(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const bool data = ud->home_is_set(
-        );
+    const bool data = ud->home_is_set();
 
     ud->get_semaphore().give();
     lua_pushboolean(L, data);
@@ -1416,8 +1392,7 @@ static int AP_AHRS_groundspeed_vector(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const Vector2f &data = ud->groundspeed_vector(
-        );
+    const Vector2f &data = ud->groundspeed_vector();
 
     ud->get_semaphore().give();
     new_Vector2f(L);
@@ -1433,8 +1408,7 @@ static int AP_AHRS_wind_estimate(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const Vector3f &data = ud->wind_estimate(
-        );
+    const Vector3f &data = ud->wind_estimate();
 
     ud->get_semaphore().give();
     new_Vector3f(L);
@@ -1471,8 +1445,7 @@ static int AP_AHRS_get_gyro(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const Vector3f &data = ud->get_gyro(
-        );
+    const Vector3f &data = ud->get_gyro();
 
     ud->get_semaphore().give();
     new_Vector3f(L);
@@ -1488,8 +1461,7 @@ static int AP_AHRS_get_home(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const Location &data = ud->get_home(
-        );
+    const Location &data = ud->get_home();
 
     ud->get_semaphore().give();
     new_Location(L);
@@ -1527,8 +1499,7 @@ static int AP_AHRS_get_yaw(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const float data = ud->get_yaw(
-        );
+    const float data = ud->get_yaw();
 
     ud->get_semaphore().give();
     lua_pushnumber(L, data);
@@ -1543,8 +1514,7 @@ static int AP_AHRS_get_pitch(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const float data = ud->get_pitch(
-        );
+    const float data = ud->get_pitch();
 
     ud->get_semaphore().give();
     lua_pushnumber(L, data);
@@ -1559,8 +1529,7 @@ static int AP_AHRS_get_roll(lua_State *L) {
 
     binding_argcheck(L, 1);
     ud->get_semaphore().take_blocking();
-    const float data = ud->get_roll(
-        );
+    const float data = ud->get_roll();
 
     ud->get_semaphore().give();
     lua_pushnumber(L, data);
@@ -1606,7 +1575,6 @@ const luaL_Reg notify_meta[] = {
 
 const luaL_Reg AP_GPS_meta[] = {
     {"first_unconfigured_gps", AP_GPS_first_unconfigured_gps},
-    {"all_configured", AP_GPS_all_configured},
     {"get_antenna_offset", AP_GPS_get_antenna_offset},
     {"have_vertical_velocity", AP_GPS_have_vertical_velocity},
     {"last_message_time_ms", AP_GPS_last_message_time_ms},

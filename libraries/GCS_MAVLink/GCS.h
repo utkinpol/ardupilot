@@ -51,7 +51,7 @@ public:
     void        init(AP_HAL::UARTDriver *port, mavlink_channel_t mav_chan);
     void        setup_uart(uint8_t instance);
     void        send_message(enum ap_message id);
-    void        send_text(MAV_SEVERITY severity, const char *fmt, ...) const;
+    void        send_text(MAV_SEVERITY severity, const char *fmt, ...) const FMT_PRINTF(3, 4);
     void        send_textv(MAV_SEVERITY severity, const char *fmt, va_list arg_list) const;
     void        queued_param_send();
     void        queued_mission_request_send();
@@ -253,7 +253,7 @@ protected:
 
     virtual bool in_hil_mode() const { return false; }
 
-    bool mavlink_coordinate_frame_to_location_alt_frame(uint8_t coordinate_frame,
+    bool mavlink_coordinate_frame_to_location_alt_frame(MAV_FRAME coordinate_frame,
                                                         Location::AltFrame &frame);
 
     // overridable method to check for packet acceptance. Allows for
@@ -396,7 +396,6 @@ protected:
     virtual void send_global_position_int();
 
     // message sending functions:
-    bool try_send_compass_message(enum ap_message id);
     bool try_send_mission_message(enum ap_message id);
     void send_hwstatus();
     void handle_data_packet(const mavlink_message_t &msg);
@@ -696,7 +695,7 @@ public:
 
     void send_to_active_channels(uint32_t msgid, const char *pkt);
 
-    void send_text(MAV_SEVERITY severity, const char *fmt, ...);
+    void send_text(MAV_SEVERITY severity, const char *fmt, ...) FMT_PRINTF(3, 4);
     void send_textv(MAV_SEVERITY severity, const char *fmt, va_list arg_list);
     virtual void send_statustext(MAV_SEVERITY severity, uint8_t dest_bitmask, const char *text);
     void service_statustext(void);

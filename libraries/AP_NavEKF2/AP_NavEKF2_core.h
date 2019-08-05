@@ -324,6 +324,9 @@ public:
     */
     void writeExtNavData(const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
+    // return true when external nav data is also being used as a yaw observation
+    bool isExtNavUsedForYaw(void);
+
 private:
     // Reference to the global EKF frontend for parameters
     NavEKF2 *frontend;
@@ -710,7 +713,7 @@ private:
     void controlMagYawReset();
 
     // Set the NED origin to be used until the next filter reset
-    void setOrigin();
+    void setOrigin(const Location &loc);
 
     // determine if a takeoff is expected so that we can compensate for expected barometer errors due to ground effect
     bool getTakeoffExpected();
