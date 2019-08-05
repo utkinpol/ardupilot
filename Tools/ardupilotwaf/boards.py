@@ -118,12 +118,14 @@ class Board:
             '-Werror=shadow',
             '-Werror=return-type',
             '-Werror=unused-result',
+            '-Werror=unused-variable',
             '-Werror=narrowing',
             '-Werror=attributes',
             '-Werror=overflow',
             '-Werror=parentheses',
             '-Werror=format-extra-args',
             '-Werror=delete-non-virtual-dtor',
+            '-Werror=ignored-qualifiers',
         ]
 
         if cfg.options.scripting_checks:

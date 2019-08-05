@@ -661,10 +661,7 @@ class AutoTestCopter(AutoTest):
         self.progress("home: %s" % str(m))
 
         self.start_subtest("ensure we can't arm if ouside fence")
-        fence = os.path.join(self.mission_directory(),
-                             "fence-in-middle-of-nowhere.txt")
-        self.mavproxy.send('fence load %s\n' % fence)
-        self.mavproxy.expect("Loaded 6 geo-fence")
+        self.load_fence_using_mavproxy("fence-in-middle-of-nowhere.txt")
         self.delay_sim_time(5) # let fence check run so it loads-from-eeprom
         seen_statustext = False
         seen_command_ack = False
@@ -1473,7 +1470,7 @@ class AutoTestCopter(AutoTest):
             self.set_rc(1, 1600)
             tstart = self.get_sim_time()
             while True:
-                vicon_pos = self.mav.recv_match(type='VICON_POSITION_ESTIMATE',
+                vicon_pos = self.mav.recv_match(type='VISION_POSITION_ESTIMATE',
                                                 blocking=True)
                 # print("vpe=%s" % str(vicon_pos))
                 self.mav.recv_match(type='GLOBAL_POSITION_INT',
@@ -3299,10 +3296,7 @@ class AutoTestCopter(AutoTest):
         self.context_push()
         ex = None
         try:
-            avoid_filepath = os.path.join(self.mission_directory(),
-                                          "copter-avoidance-fence.txt")
-            self.mavproxy.send("fence load %s\n" % avoid_filepath)
-            self.mavproxy.expect("Loaded 5 geo-fence")
+            self.load_fence("copter-avoidance-fence.txt")
             self.set_parameter("FENCE_ENABLE", 0)
             self.set_parameter("PRX_TYPE", 10)
             self.set_parameter("RC10_OPTION", 40) # proximity-enable
@@ -3324,10 +3318,7 @@ class AutoTestCopter(AutoTest):
         self.context_push()
         ex = None
         try:
-            avoid_filepath = os.path.join(self.mission_directory(),
-                                          "copter-avoidance-fence.txt")
-            self.mavproxy.send("fence load %s\n" % avoid_filepath)
-            self.mavproxy.expect("Loaded 5 geo-fence")
+            self.load_fence("copter-avoidance-fence.txt")
             self.set_parameter("FENCE_ENABLE", 1)
             self.check_avoidance_corners()
         except Exception as e:

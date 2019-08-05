@@ -198,7 +198,7 @@ void GCS_MAVLINK_Plane::send_position_target_global_int()
     mavlink_msg_position_target_global_int_send(
         chan,
         AP_HAL::millis(), // time_boot_ms
-        MAV_FRAME_GLOBAL_INT, // targets are always global altitude
+        MAV_FRAME_GLOBAL, // targets are always global altitude
         0xFFF8, // ignore everything except the x/y/z components
         next_WP_loc.lat, // latitude as 1e7
         next_WP_loc.lng, // longitude as 1e7
@@ -321,7 +321,7 @@ void GCS_MAVLINK_Plane::send_pid_info(const AP_Logger::PID_Info *pid_info,
         return;
     }
      mavlink_msg_pid_tuning_send(chan, axis,
-                                 pid_info->desired,
+                                 pid_info->target,
                                  achieved,
                                  pid_info->FF,
                                  pid_info->P,
@@ -756,7 +756,8 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
         else if (packet.frame == MAV_FRAME_GLOBAL_TERRAIN_ALT_INT) {
             requested_position.terrain_alt = 1;
         }
-        else if (packet.frame != MAV_FRAME_GLOBAL_INT) {
+        else if (packet.frame != MAV_FRAME_GLOBAL_INT &&
+                 packet.frame != MAV_FRAME_GLOBAL) {
             // not a supported frame
             return MAV_RESULT_FAILED;
         }
@@ -1295,6 +1296,7 @@ void GCS_MAVLINK_Plane::handleMessage(const mavlink_message_t &msg)
             cmd.content.location.terrain_alt = false;
             switch (pos_target.coordinate_frame) 
             {
+                case MAV_FRAME_GLOBAL:
                 case MAV_FRAME_GLOBAL_INT:
                     break; //default to MSL altitude
                 case MAV_FRAME_GLOBAL_RELATIVE_ALT_INT:

@@ -147,9 +147,9 @@ void AP_MotorsMatrix::output_armed_stabilizing()
 
     // apply voltage and air pressure compensation
     const float compensation_gain = get_compensation_gain(); // compensation for battery voltage and altitude
-    roll_thrust = _roll_in * compensation_gain;
-    pitch_thrust = _pitch_in * compensation_gain;
-    yaw_thrust = _yaw_in * compensation_gain;
+    roll_thrust = (_roll_in + _roll_in_ff) * compensation_gain;
+    pitch_thrust = (_pitch_in + _pitch_in_ff) * compensation_gain;
+    yaw_thrust = (_yaw_in + _yaw_in_ff) * compensation_gain;
     throttle_thrust = get_throttle() * compensation_gain;
     throttle_avg_max = _throttle_avg_max * compensation_gain;
     throttle_thrust_max = _thrust_boost_ratio + (1.0f - _thrust_boost_ratio) * _throttle_thrust_max;
@@ -218,7 +218,8 @@ void AP_MotorsMatrix::output_armed_stabilizing()
     // check for roll and pitch saturation
     if (rp_high - rp_low > 1.0f || throttle_avg_max < -rp_low) {
         // Full range is being used by roll and pitch.
-        limit.roll_pitch = true;
+        limit.roll = true;
+        limit.pitch = true;
     }
 
     // calculate the highest allowed average thrust that will provide maximum control range
@@ -275,7 +276,8 @@ void AP_MotorsMatrix::output_armed_stabilizing()
     thr_adj = throttle_thrust - throttle_thrust_best_rpy;
     if (rpy_scale < 1.0f) {
         // Full range is being used by roll, pitch, and yaw.
-        limit.roll_pitch = true;
+        limit.roll = true;
+        limit.pitch = true;
         limit.yaw = true;
         if (thr_adj > 0.0f) {
             limit.throttle_upper = true;

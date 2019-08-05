@@ -352,6 +352,9 @@ public:
     // write EKF information to on-board logs
     void Log_Write();
 
+    // check if external navigation is being used for yaw observation
+    bool isExtNavUsedForYaw(void) const;
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
@@ -446,6 +449,10 @@ private:
     const uint16_t gndEffectTimeout_ms = 1000;     // time in msec that ground effect mode is active after being activated
     const float gndEffectBaroScaler = 4.0f;        // scaler applied to the barometer observation variance when ground effect mode is active
     const uint8_t fusionTimeStep_ms = 10;          // The minimum time interval between covariance predictions and measurement fusions in msec
+
+    // origin set by one of the cores
+    struct Location common_EKF_origin;
+    bool common_origin_valid;
 
     struct {
         bool enabled:1;

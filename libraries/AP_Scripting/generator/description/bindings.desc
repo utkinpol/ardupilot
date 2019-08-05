@@ -77,8 +77,7 @@ singleton AP_GPS method last_fix_time_ms uint32_t uint8_t 0 ud->num_sensors()
 singleton AP_GPS method last_message_time_ms uint32_t uint8_t 0 ud->num_sensors()
 singleton AP_GPS method have_vertical_velocity boolean uint8_t 0 ud->num_sensors()
 singleton AP_GPS method get_antenna_offset Vector3f uint8_t 0 ud->num_sensors()
-singleton AP_GPS method all_configured boolean
-singleton AP_GPS method first_unconfigured_gps uint8_t
+singleton AP_GPS method first_unconfigured_gps boolean uint8_t'Null
 
 include AP_Math/AP_Math.h
 
@@ -87,9 +86,9 @@ userdata Vector3f field y float read write -FLT_MAX FLT_MAX
 userdata Vector3f field z float read write -FLT_MAX FLT_MAX
 userdata Vector3f method length float
 userdata Vector3f method normalize void
-userdata Vector3f method is_nan void
-userdata Vector3f method is_inf void
-userdata Vector3f method is_zero void
+userdata Vector3f method is_nan boolean
+userdata Vector3f method is_inf boolean
+userdata Vector3f method is_zero boolean
 userdata Vector3f operator +
 userdata Vector3f operator -
 
@@ -97,9 +96,9 @@ userdata Vector2f field x float read write -FLT_MAX FLT_MAX
 userdata Vector2f field y float read write -FLT_MAX FLT_MAX
 userdata Vector2f method length float
 userdata Vector2f method normalize void
-userdata Vector2f method is_nan void
-userdata Vector2f method is_inf void
-userdata Vector2f method is_zero void
+userdata Vector2f method is_nan boolean
+userdata Vector2f method is_inf boolean
+userdata Vector2f method is_zero boolean
 userdata Vector2f operator +
 userdata Vector2f operator -
 
@@ -132,4 +131,4 @@ singleton AP_Relay method toggle void uint8_t 0 AP_RELAY_NUM_RELAYS
 
 include GCS_MAVLink/GCS.h
 singleton GCS alias gcs
-singleton GCS method send_text void MAV_SEVERITY'enum MAV_SEVERITY_EMERGENCY MAV_SEVERITY_DEBUG string
+singleton GCS method send_text void MAV_SEVERITY'enum MAV_SEVERITY_EMERGENCY MAV_SEVERITY_DEBUG "%s"'literal string

@@ -651,8 +651,8 @@ const AP_Param::ConversionInfo conversion_table[] = {
     { Parameters::k_param_fs_batt_voltage,   0,      AP_PARAM_FLOAT,  "BATT_LOW_VOLT" },
     { Parameters::k_param_fs_batt_mah,       0,      AP_PARAM_FLOAT,  "BATT_LOW_MAH" },
     { Parameters::k_param_failsafe_battery_enabled,       0,      AP_PARAM_INT8,  "BATT_FS_LOW_ACT" },
-
     { Parameters::k_param_compass_enabled_deprecated,       0,      AP_PARAM_INT8, "COMPASS_ENABLE" },
+    { Parameters::k_param_arming,            2,     AP_PARAM_INT16,  "ARMING_CHECK" },
 };
 
 void Sub::load_parameters()
@@ -705,6 +705,18 @@ void Sub::load_parameters()
 
 void Sub::convert_old_parameters()
 {
+    // attitude control filter parameter changes from _FILT to FLTE or FLTD
+    const AP_Param::ConversionInfo filt_conversion_info[] = {
+        // move ATC_RAT_RLL/PIT_FILT to FLTD, move ATC_RAT_YAW_FILT to FLTE
+        { Parameters::k_param_attitude_control, 385, AP_PARAM_FLOAT, "ATC_RAT_RLL_FLTE" },
+        { Parameters::k_param_attitude_control, 386, AP_PARAM_FLOAT, "ATC_RAT_PIT_FLTE" },
+        { Parameters::k_param_attitude_control, 387, AP_PARAM_FLOAT, "ATC_RAT_YAW_FLTE" },
+    };
+    uint8_t filt_table_size = ARRAY_SIZE(filt_conversion_info);
+    for (uint8_t i=0; i<filt_table_size; i++) {
+        AP_Param::convert_old_parameters(&filt_conversion_info[i], 1.0f);
+    }
+
     const uint8_t old_rc_keys[14] = { Parameters::k_param_rc_1_old,  Parameters::k_param_rc_2_old,
                                       Parameters::k_param_rc_3_old,  Parameters::k_param_rc_4_old,
                                       Parameters::k_param_rc_5_old,  Parameters::k_param_rc_6_old,

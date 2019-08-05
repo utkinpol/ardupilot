@@ -10,7 +10,7 @@ OSCILLATOR_HZ 16000000
 USB_VENDOR 0x3162 # ONLY FOR USE BY Holybro
 USB_PRODUCT 0x004B
 USB_STRING_MANUFACTURER "Holybro"
-USB_STRING_PRODUCT "Pixhawk6"
+USB_STRING_PRODUCT "Durandal"
 USB_STRING_SERIAL  "%SERIAL%"
 
 # board ID for firmware load
@@ -29,6 +29,9 @@ STM32_VDD 330U
 
 # order of UARTs (and USB)
 UART_ORDER OTG1 USART1 USART2 USART3 UART4 USART6 UART7 OTG2
+
+# default the 2nd interface to MAVLink2 until MissionPlanner updates drivers
+define HAL_OTG2_PROTOCOL SerialProtocol_MAVLink2
 
 define HAL_STORAGE_SIZE 16384
 
@@ -323,7 +326,7 @@ define HAL_OS_FATFS_IO 1
 define HAL_BOARD_LOG_DIRECTORY "/APM/LOGS"
 define HAL_BOARD_TERRAIN_DIRECTORY "/APM/TERRAIN"
 
-ROMFS io_firmware.bin Tools/IO_Firmware/fmuv2_IO.bin
+ROMFS io_firmware.bin Tools/IO_Firmware/iofirmware_lowpolh.bin
 
 # don't share IOMCU DMA
 DMA_NOSHARE UART8* SPI1* TIM*UP*
