@@ -863,6 +863,7 @@ private:
     float lookahead_adjustment(void);
     float rangefinder_correction(void);
     void rangefinder_height_update(void);
+    void rangefinder_terrain_correction(float &height);
     void set_next_WP(const struct Location &loc);
     void set_guided_WP(void);
     void update_home();
@@ -936,6 +937,7 @@ private:
     int16_t rudder_input(void);
     void control_failsafe();
     bool trim_radio();
+    bool rc_throttle_value_ok(void) const;
     bool rc_failsafe_active(void) const;
     void read_rangefinder(void);
     void read_airspeed(void);

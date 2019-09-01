@@ -18,7 +18,7 @@
    ArduPlane by Jean-Louis Naudin (JLN), and then rewritten after the
    AP_HAL merge by Andrew Tridgell
 
-   Maintainer: Grant Morphett
+   Maintainer: Randy Mackay, Grant Morphett
 
    Authors:    Doug Weibel, Jose Julio, Jordi Munoz, Jason Short, Andrew Tridgell, Randy Mackay, Pat Hickey, John Arne Birkeland, Olivier Adler, Jean-Louis Naudin, Grant Morphett
 
@@ -282,15 +282,6 @@ void Rover::one_second_loop(void)
     if (!hal.util->get_soft_armed()) {
         update_home();
     }
-
-    // init compass location for declination
-    init_compass_location();
-
-    // update error mask of sensors and subsystems. The mask uses the
-    // MAV_SYS_STATUS_* values from mavlink. If a bit is set then it
-    // indicates that the sensor or subsystem is present but not
-    // functioning correctly
-    gcs().update_sensor_status_flags();
 
     // need to set "likely flying" when armed to allow for compass
     // learning to run

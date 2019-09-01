@@ -27,6 +27,8 @@
 #include <AC_Fence/AC_Fence.h>
 #include <AP_InternalError/AP_InternalError.h>
 #include <AP_GPS/AP_GPS.h>
+#include <AP_Airspeed/AP_Airspeed.h>
+#include <AP_AHRS/AP_AHRS.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_RangeFinder/AP_RangeFinder.h>
 
@@ -685,7 +687,7 @@ bool AP_Arming::system_checks(bool report)
         }
     }
     if (AP::internalerror().errors() != 0) {
-        check_failed(ARMING_CHECK_NONE, report, "Internal errors (0x%x)", AP::internalerror().errors());
+        check_failed(ARMING_CHECK_NONE, report, "Internal errors (0x%x)", (unsigned int)AP::internalerror().errors());
         return false;
     }
 

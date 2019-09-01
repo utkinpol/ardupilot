@@ -72,7 +72,7 @@ bool AP_RTC::get_utc_usec(uint64_t &usec) const
     return true;
 }
 
-bool AP_RTC::get_system_clock_utc(int32_t &hour, int32_t &min, int32_t &sec, int32_t &ms)
+bool AP_RTC::get_system_clock_utc(uint8_t &hour, uint8_t &min, uint8_t &sec, uint16_t &ms)
 {
      // get time of day in ms
     uint64_t time_ms = 0;
@@ -95,8 +95,12 @@ bool AP_RTC::get_system_clock_utc(int32_t &hour, int32_t &min, int32_t &sec, int
     return true;
 }
 
-// get milliseconds from now to a target time of day expressed as hour, min, sec, ms
-// match starts from first value that is not -1. I.e. specifying hour=-1, minutes=10 will ignore the hour and return time until 10 minutes past 12am (utc)
+// get milliseconds from now to a target time of day expressed as
+// hour, min, sec, ms.  Match starts from first value that is not
+// -1. I.e. specifying hour=-1, minutes=10 will ignore the hour and
+// return time until 10 minutes past 12am (utc) NOTE: if this time has
+// just past then you can expect a return value of roughly 86340000 -
+// the number of milliseconds in a day.
 uint32_t AP_RTC::get_time_utc(int32_t hour, int32_t min, int32_t sec, int32_t ms)
 {
     // determine highest value specified (0=none, 1=ms, 2=sec, 3=min, 4=hour)
@@ -115,7 +119,8 @@ uint32_t AP_RTC::get_time_utc(int32_t hour, int32_t min, int32_t sec, int32_t ms
     }
 
     // get start_time_ms as h, m, s, ms
-    int32_t curr_hour, curr_min, curr_sec, curr_ms;
+    uint8_t curr_hour, curr_min, curr_sec;
+    uint16_t curr_ms;
     if (!get_system_clock_utc(curr_hour, curr_min, curr_sec, curr_ms)) {
         return 0;
     }

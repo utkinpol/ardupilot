@@ -339,6 +339,7 @@ class AutoTest(ABC):
 
     def reboot_sitl(self, required_bootcount=None):
         """Reboot SITL instance and wait for it to reconnect."""
+        self.progress("Rebooting SITL")
         self.reboot_sitl_mav(required_bootcount=required_bootcount)
         self.assert_simstate_location_is_at_startup_location()
 
@@ -1076,11 +1077,11 @@ class AutoTest(ABC):
             return True
         return False
 
-    def set_parameter(self, name, value, add_to_context=True, epsilon=0.0002):
+    def set_parameter(self, name, value, add_to_context=True, epsilon=0.0002, retries=10):
         """Set parameters from vehicle."""
         self.progress("Setting %s to %f" % (name, value))
         old_value = self.get_parameter(name, retry=2)
-        for i in range(1, 10):
+        for i in range(1, retries+2):
             self.mavproxy.send("param set %s %s\n" % (name, str(value)))
             returned_value = self.get_parameter(name)
             delta = float(value) - returned_value
@@ -1908,7 +1909,10 @@ class AutoTest(ABC):
                 return
         raise AutoTestTimeoutException("Failed to get EKF.flags=%u disabled" % not_required_value)
 
-    def wait_text(self, text, timeout=20, the_function=None):
+    def wait_text(self, *args, **kwargs):
+        self.wait_statustext(*args, **kwargs)
+
+    def wait_statustext(self, text, timeout=20, the_function=None):
         """Wait a specific STATUS_TEXT."""
         self.progress("Waiting for text : %s" % text.lower())
         tstart = self.get_sim_time()
@@ -1940,7 +1944,7 @@ class AutoTest(ABC):
 
     def check_sitl_reset(self):
         self.wait_heartbeat()
-        self.clear_mission()
+        self.clear_mission_using_mavproxy()
         if self.armed():
             self.progress("Armed at end of test; force-rebooting SITL")
             self.disarm_vehicle(force=True)
@@ -2154,8 +2158,9 @@ class AutoTest(ABC):
         if m.mission_type != mission_type:
             raise NotAchievedException("Mission ack not of expected mission type")
         if m.type != mavutil.mavlink.MAV_MISSION_ACCEPTED:
-            raise NotAchievedException("Mission upload failed (%u)" % m.type)
-        self.progress("Upload succeeded")
+            raise NotAchievedException("Mission upload failed (%s)" %
+                                       (mavutil.mavlink.enums["MAV_MISSION_RESULT"][m.type].name),)
+        self.progress("Upload of all %u items succeeded" % len(items))
 
     def download_using_mission_protocol(self, mission_type):
         '''mavlink2 required'''
@@ -2168,7 +2173,7 @@ class AutoTest(ABC):
         while True:
             m = self.mav.recv_match(type='MISSION_COUNT',
                                     blocking=True,
-                                    timeout=1)
+                                    timeout=5)
             self.progress(str(m))
             if m is None:
                 raise NotAchievedException("Did not get MISSION_COUNT response")
@@ -2184,7 +2189,8 @@ class AutoTest(ABC):
         next_to_request = 0
         while True:
             if self.get_sim_time_cached() - tstart > 10:
-                raise NotAchievedException("timeout downloading %s" % str(mission_type))
+                raise NotAchievedException("timeout downloading type=%s" %
+                                           (mavutil.mavlink.enums["MAV_MISSION_TYPE"][mission_type].name))
             if len(remaining_to_receive) == 0:
                 self.progress("All received")
                 return items
@@ -2195,14 +2201,15 @@ class AutoTest(ABC):
                                                   mission_type)
             m = self.mav.recv_match(type='MISSION_ITEM_INT',
                                     blocking=True,
-                                    timeout=1)
+                                    timeout=5)
+            self.progress("Got (%s)" % str(m))
             if m is None:
                 raise NotAchievedException("Did not receive MISSION_ITEM_INT")
             if m.mission_type != mission_type:
                 raise NotAchievedException("Received waypoint of wrong type")
             if m.seq != next_to_request:
                 raise NotAchievedException("Received waypoint is out of sequence")
-            self.progress("Got item %u" % m.seq)
+            self.progress("Item %u OK" % m.seq)
             items.append(m)
             next_to_request += 1
             remaining_to_receive.discard(m.seq)
@@ -2374,6 +2381,9 @@ class AutoTest(ABC):
         if self.distance_to_home() > 1:
             raise NotAchievedException("Setting home to current location did not work")
 
+        if self.is_tracker():
+            # tracker starts armed...
+            self.disarm_vehicle(force=True)
         self.reboot_sitl()
 
     def test_dataflash_over_mavlink(self):
@@ -2603,6 +2613,7 @@ class AutoTest(ABC):
                              want_result=mavutil.mavlink.MAV_RESULT_FAILED
                              )
                 self.set_parameter("SIM_GPS_DISABLE", 0)
+                self.wait_ekf_happy() # EKF may stay unhappy for a while
                 self.progress("PASS not able to arm without Position in mode : %s" % mode)
             if mode in self.get_no_position_not_settable_modes_list():
                 self.progress("Setting mode need Position : %s" % mode)
@@ -2761,7 +2772,7 @@ class AutoTest(ABC):
             self.mavproxy.send("set streamrate %u\n" % sr)
 
         except Exception as e:
-            self.progress("Caught exception %s" %
+            self.progress("Caught exception: %s" %
                           self.get_exception_stacktrace(e))
             # tell MAVProxy to start stuffing around with the rates:
             sr = self.sitl_streamrate()
@@ -2788,7 +2799,13 @@ class AutoTest(ABC):
         if m is None:
             raise NotAchievedException("Requested CAMERA_FEEDBACK did not arrive")
 
-    def clear_mission(self):
+    def clear_fence_using_mavproxy(self):
+        self.mavproxy.send("fence clear\n")
+
+    def clear_fence(self):
+        self.clear_fence_using_mavproxy()
+
+    def clear_mission_using_mavproxy(self):
         self.mavproxy.send("wp clear\n")
         self.mavproxy.send('wp list\n')
         self.mavproxy.expect('Requesting [0-9]+ waypoints')
@@ -2806,6 +2823,12 @@ class AutoTest(ABC):
         try:
             self.set_parameter("STAT_BOOTCNT", 0)
             self.set_parameter("SIM_BARO_COUNT", 0)
+
+            if self.is_tracker():
+                # starts armed...
+                self.progress("Disarming tracker")
+                self.disarm_vehicle(force=True)
+
             self.reboot_sitl(required_bootcount=1);
             self.progress("Waiting for 'Check BRD_TYPE'")
             self.mavproxy.expect("Check BRD_TYPE");
@@ -2816,6 +2839,11 @@ class AutoTest(ABC):
 
         self.progress("Resetting SIM_BARO_COUNT")
         self.set_parameter("SIM_BARO_COUNT", old_sim_baro_count)
+
+        if self.is_tracker():
+            # starts armed...
+            self.progress("Disarming tracker")
+            self.disarm_vehicle(force=True)
 
         self.progress("Calling reboot-sitl ")
         self.reboot_sitl(required_bootcount=2);
@@ -3042,6 +3070,25 @@ switch value'''
 
         return True
 
+    def test_parameters(self):
+        '''general small tests for parameter system'''
+        self.start_subtest("Ensure GCS is not be able to set MIS_TOTAL")
+        old_mt = self.get_parameter("MIS_TOTAL")
+        ex = None
+        try:
+            self.set_parameter("MIS_TOTAL", 17, retries=0)
+        except ValueError as e:
+            ex = e
+        if ex is None:
+            raise NotAchievedException("Set parameter when I shouldn't have")
+        if old_mt != self.get_parameter("MIS_TOTAL"):
+            raise NotAchievedException("Total has changed")
+
+        self.start_subtest("Ensure GCS is able to set other MIS_ parameters")
+        self.set_parameter("MIS_OPTIONS", 1)
+        if self.get_parameter("MIS_OPTIONS") != 1:
+            raise NotAchievedException("Failed to set MIS_OPTIONS")
+
     def disabled_tests(self):
         return {}
 
@@ -3098,6 +3145,10 @@ switch value'''
             ("SensorConfigErrorLoop",
              "Test Sensor Config Error Loop",
              self.test_sensor_config_error_loop),
+
+            ("Parameters",
+             "Test Parameter Set/Get",
+             self.test_parameters),
         ]
 
     def post_tests_announcements(self):

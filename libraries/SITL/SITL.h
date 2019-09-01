@@ -255,6 +255,27 @@ public:
 
     AP_Int8 gnd_behav;
 
+    struct {
+        AP_Int8 enable;     // 0: disabled, 1: roll and pitch, 2: roll, pitch and heave
+        AP_Float length;    // m
+        AP_Float amp;       // m
+        AP_Float direction; // deg (direction wave is coming from)
+        AP_Float speed;     // m/s
+    } wave;
+
+    struct {
+        AP_Float direction; // deg (direction tide is coming from)
+        AP_Float speed;     // m/s
+    } tide;
+
+    // original simulated position
+    struct {
+        AP_Float lat;
+        AP_Float lng;
+        AP_Float alt; // metres
+        AP_Float hdg; // 0 to 360
+    } opos;
+
     uint16_t irlock_port;
 
     void simstate_send(mavlink_channel_t chan);

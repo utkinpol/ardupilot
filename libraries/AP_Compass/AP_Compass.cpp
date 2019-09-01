@@ -435,9 +435,11 @@ const AP_Param::GroupInfo Compass::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("OFFS_MAX", 31, Compass, _offset_max, AP_COMPASS_OFFSETS_MAX_DEFAULT),
 
+#if COMPASS_MOT_ENABLED
     // @Group: PMOT
     // @Path: Compass_PerMotor.cpp
     AP_SUBGROUPINFO(_per_motor, "PMOT", 32, Compass, Compass_PerMotor),
+#endif
 
     // @Param: TYPEMASK
     // @DisplayName: Compass disable driver type mask
@@ -533,13 +535,19 @@ void Compass::init()
     // check that we are actually working before passing the compass
     // through to ARHS to use.
     if (!read()) {
+#ifndef HAL_BUILD_AP_PERIPH
         _enabled = false;
         hal.console->printf("Compass initialisation failed\n");
+#endif
+#ifndef HAL_NO_LOGGING
         AP::logger().Write_Error(LogErrorSubsystem::COMPASS, LogErrorCode::FAILED_TO_INITIALISE);
+#endif
         return;
     }
 
+#ifndef HAL_BUILD_AP_PERIPH
     AP::ahrs().set_compass(this);
+#endif
 }
 
 //  Register a new compass instance
@@ -925,12 +933,19 @@ void Compass::_detect_backends(void)
                                                            true, HAL_COMPASS_QMC5883L_ORIENTATION_EXTERNAL));
     ADD_BACKEND(DRIVER_QMC5883, AP_Compass_QMC5883L::probe(GET_I2C_DEVICE(0, HAL_COMPASS_QMC5883L_I2C_ADDR),
                                                            false, HAL_COMPASS_QMC5883L_ORIENTATION_INTERNAL));
+#elif HAL_COMPASS_DEFAULT == HAL_COMPASS_LIS3MDL_I2C
+    FOREACH_I2C(i) {
+        ADD_BACKEND(DRIVER_LIS3MDL, AP_Compass_LIS3MDL::probe(GET_I2C_DEVICE(i, HAL_COMPASS_LIS3MDL_I2C_ADDR), true, ROTATION_NONE));
+        ADD_BACKEND(DRIVER_LIS3MDL, AP_Compass_LIS3MDL::probe(GET_I2C_DEVICE(i, HAL_COMPASS_LIS3MDL_I2C_ADDR2), true, ROTATION_NONE));
+    }
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX && CONFIG_HAL_BOARD_SUBTYPE != HAL_BOARD_SUBTYPE_LINUX_NONE
     ADD_BACKEND(DRIVER_HMC5843, AP_Compass_HMC5843::probe(GET_I2C_DEVICE(HAL_COMPASS_HMC5843_I2C_BUS, HAL_COMPASS_HMC5843_I2C_ADDR)));
     ADD_BACKEND(DRIVER_AK8963, AP_Compass_AK8963::probe_mpu9250(0));
     ADD_BACKEND(DRIVER_LSM9DS1, AP_Compass_LSM9DS1::probe(hal.spi->get_device("lsm9ds1_m")));
 #elif HAL_COMPASS_DEFAULT == HAL_COMPASS_BMM150_I2C
     ADD_BACKEND(DRIVER_BMM150, AP_Compass_BMM150::probe(GET_I2C_DEVICE(HAL_COMPASS_BMM150_I2C_BUS, HAL_COMPASS_BMM150_I2C_ADDR)));
+#elif HAL_COMPASS_DEFAULT == HAL_COMPASS_RM3100_SPI
+    ADD_BACKEND(DRIVER_RM3100, AP_Compass_RM3100::probe(hal.spi->get_device("rm3100"), ROTATION_NONE));
 #elif HAL_COMPASS_DEFAULT == HAL_COMPASS_NONE
     // no compass
 #else
@@ -959,6 +974,11 @@ void Compass::_detect_backends(void)
 bool
 Compass::read(void)
 {
+#ifndef HAL_BUILD_AP_PERIPH
+    if (!_initial_location_set) {
+        try_set_initial_location();
+    }
+#endif
     for (uint8_t i=0; i< _backend_count; i++) {
         // call read on each of the backend. This call updates field[i]
         _backends[i]->read();
@@ -967,6 +987,7 @@ Compass::read(void)
     for (uint8_t i=0; i < COMPASS_MAX_INSTANCES; i++) {
         _state[i].healthy = (time - _state[i].last_update_ms < 500);
     }
+#if COMPASS_LEARN_ENABLED
     if (_learn == LEARN_INFLIGHT && !learn_allocated) {
         learn_allocated = true;
         learn = new CompassLearn(*this);
@@ -979,6 +1000,9 @@ Compass::read(void)
         AP::logger().Write_Compass();
     }
     return ret;
+#else
+    return healthy();
+#endif
 }
 
 uint8_t
@@ -1060,18 +1084,28 @@ Compass::save_motor_compensation()
     }
 }
 
-void
-Compass::set_initial_location(int32_t latitude, int32_t longitude)
+void Compass::try_set_initial_location()
 {
+    if (!_auto_declination) {
+        return;
+    }
+    if (!_enabled) {
+        return;
+    }
+
+    Location loc;
+    if (!AP::ahrs().get_position(loc)) {
+        return;
+    }
+    _initial_location_set = true;
+
     // if automatic declination is configured, then compute
     // the declination based on the initial GPS fix
-    if (_auto_declination) {
-        // Set the declination based on the lat/lng from GPS
-        _declination.set(radians(
-                AP_Declination::get_declination(
-                    (float)latitude / 10000000,
-                    (float)longitude / 10000000)));
-    }
+    // Set the declination based on the lat/lng from GPS
+    _declination.set(radians(
+                         AP_Declination::get_declination(
+                             (float)loc.lat / 10000000,
+                             (float)loc.lng / 10000000)));
 }
 
 /// return true if the compass should be used for yaw calculations

@@ -644,7 +644,6 @@ void Replay::read_sensors(const char *type)
             if (!_vehicle.ahrs.set_home(loc)) {
                 ::printf("Failed to set home to that location!");
             }
-            _vehicle.compass.set_initial_location(loc.lat, loc.lng);
             done_home_init = true;
         }
     }
@@ -958,7 +957,7 @@ bool Replay::check_user_param(const char *name)
     return false;
 }
 
-const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
+const struct AP_Param::GroupInfo        GCS_MAVLINK_Parameters::var_info[] = {
     AP_GROUPEND
 };
 GCS_Dummy _gcs;

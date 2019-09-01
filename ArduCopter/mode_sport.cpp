@@ -54,15 +54,15 @@ void ModeSport::run()
 
     const float angle_max = copter.aparm.angle_max;
     if (roll_angle > angle_max){
-        target_roll_rate -=  g.acro_rp_p*(roll_angle-angle_max);
+        target_roll_rate +=  AC_AttitudeControl::sqrt_controller(angle_max - roll_angle, g.acro_rp_p * 4.5, attitude_control->get_accel_roll_max(), G_Dt);
     }else if (roll_angle < -angle_max) {
-        target_roll_rate -=  g.acro_rp_p*(roll_angle+angle_max);
+        target_roll_rate +=  AC_AttitudeControl::sqrt_controller(-angle_max - roll_angle, g.acro_rp_p * 4.5, attitude_control->get_accel_roll_max(), G_Dt);
     }
 
     if (pitch_angle > angle_max){
-        target_pitch_rate -=  g.acro_rp_p*(pitch_angle-angle_max);
+        target_pitch_rate +=  AC_AttitudeControl::sqrt_controller(angle_max - pitch_angle, g.acro_rp_p * 4.5, attitude_control->get_accel_pitch_max(), G_Dt);
     }else if (pitch_angle < -angle_max) {
-        target_pitch_rate -=  g.acro_rp_p*(pitch_angle+angle_max);
+        target_pitch_rate +=  AC_AttitudeControl::sqrt_controller(-angle_max - pitch_angle, g.acro_rp_p * 4.5, attitude_control->get_accel_pitch_max(), G_Dt);
     }
 
     // get pilot's desired yaw rate
@@ -117,7 +117,7 @@ void ModeSport::run()
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
         // adjust climb rate using rangefinder
-        target_climb_rate = copter.get_surface_tracking_climb_rate(target_climb_rate);
+        target_climb_rate = copter.surface_tracking.adjust_climb_rate(target_climb_rate);
 
         // get avoidance adjusted climb rate
         target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);

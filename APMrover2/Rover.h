@@ -274,18 +274,6 @@ private:
     // true if we have a position estimate from AHRS
     bool have_position;
 
-    // obstacle detection information
-    struct {
-        // have we detected an obstacle?
-        uint8_t detected_count;
-        float turn_angle;
-        uint16_t rangefinder1_distance_cm;
-        uint16_t rangefinder2_distance_cm;
-
-        // time when we last detected an obstacle, in milliseconds
-        uint32_t detected_time_ms;
-    } obstacle;
-
     // range finder last update (used for DPTH logging)
     uint32_t rangefinder_last_reading_ms;
 
@@ -415,7 +403,6 @@ private:
     void Log_Write_Startup(uint8_t type);
     void Log_Write_Steering();
     void Log_Write_Throttle();
-    void Log_Write_Rangefinder();
     void Log_Write_RC(void);
     void Log_Write_Vehicle_Startup_Messages();
     void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page);
@@ -436,7 +423,6 @@ private:
     bool trim_radio();
 
     // sensors.cpp
-    void init_compass_location(void);
     void update_compass(void);
     void compass_save(void);
     void init_beacon();
@@ -490,8 +476,8 @@ public:
     void failsafe_check();
     // Motor test
     void motor_test_output();
-    bool mavlink_motor_test_check(mavlink_channel_t chan, bool check_rc, uint8_t motor_seq, uint8_t throttle_type, int16_t throttle_value);
-    MAV_RESULT mavlink_motor_test_start(mavlink_channel_t chan, uint8_t motor_seq, uint8_t throttle_type, int16_t throttle_value, float timeout_sec);
+    bool mavlink_motor_test_check(const GCS_MAVLINK &gcs_chan, bool check_rc, AP_MotorsUGV::motor_test_order motor_instance, uint8_t throttle_type, int16_t throttle_value);
+    MAV_RESULT mavlink_motor_test_start(const GCS_MAVLINK &gcs_chan, AP_MotorsUGV::motor_test_order motor_instance, uint8_t throttle_type, int16_t throttle_value, float timeout_sec);
     void motor_test_stop();
 
     // frame type
@@ -500,9 +486,6 @@ public:
 
     // Simple mode
     float simple_sin_yaw;
-
-    // sailboat enabled
-    bool get_sailboat_enable() { return g2.sailboat.enabled(); }
 };
 
 extern const AP_HAL::HAL& hal;

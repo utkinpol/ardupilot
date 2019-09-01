@@ -20,13 +20,16 @@ void Tracker::init_tracker()
     // Check the EEPROM format version before loading any parameters from EEPROM
     load_parameters();
 
+    // initialise stats module
+    stats.init();
+
     mavlink_system.sysid = g.sysid_this_mav;
 
     // initialise serial ports
     serial_manager.init();
 
     // setup first port early to allow BoardConfig to report errors
-    gcs().chan(0).setup_uart(0);
+    gcs().setup_console();
 
     // Register mavlink_delay_cb, which will run anytime you have
     // more than 5ms remaining in your call to hal.scheduler->delay

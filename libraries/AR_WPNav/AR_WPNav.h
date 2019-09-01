@@ -66,6 +66,9 @@ public:
     float nav_bearing_cd() const { return _desired_heading_cd; }
     float crosstrack_error() const { return _cross_track_error; }
 
+    // return the heading (in centi-degrees) to the next waypoint accounting for OA, (used by sailboats)
+    float oa_wp_bearing_cd() const { return _oa_wp_bearing_cd; }
+
     // settor to allow vehicle code to provide turn related param values to this library (should be updated regularly)
     void set_turn_params(float turn_max_g, float turn_radius, bool pivot_possible);
 
@@ -108,10 +111,14 @@ private:
     // returns true if vehicle should pivot immediately (because heading error is too large)
     bool use_pivot_steering(float yaw_error_cd);
 
+    // adjust speed to ensure it does not fall below value held in SPEED_MIN
+    void apply_speed_min(float &desired_speed);
+
 private:
 
     // parameters
     AP_Float _speed_max;            // target speed between waypoints in m/s
+    AP_Float _speed_min;            // target speed minimum in m/s.  Vehicle will not slow below this speed for corners
     AP_Float _radius;               // distance in meters from a waypoint when we consider the waypoint has been reached
     AP_Float _overshoot;            // maximum horizontal overshoot in meters
     AP_Int16 _pivot_angle;          // angle error that leads to pivot turn
