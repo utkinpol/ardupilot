@@ -28,7 +28,7 @@
 #include "AP_Compass.h"
 #include "Compass_learn.h"
 
-extern AP_HAL::HAL& hal;
+extern const AP_HAL::HAL& hal;
 
 #if APM_BUILD_TYPE(APM_BUILD_ArduCopter) || APM_BUILD_TYPE(APM_BUILD_ArduSub)
 #define COMPASS_LEARN_DEFAULT Compass::LEARN_NONE
@@ -708,15 +708,18 @@ void Compass::_probe_external_i2c_compasses(void)
         } else {
             default_rotation = ROTATION_PITCH_180;
         }
+        // probe all 4 possible addresses
+        const uint8_t ist8310_addr[] = { 0x0C, 0x0D, 0x0E, 0x0F };
 
-        FOREACH_I2C_EXTERNAL(i) {
-            ADD_BACKEND(DRIVER_IST8310, AP_Compass_IST8310::probe(GET_I2C_DEVICE(i, HAL_COMPASS_IST8310_I2C_ADDR),
-                                                                  true, default_rotation));
-        }
-        
-        FOREACH_I2C_INTERNAL(i) {
-            ADD_BACKEND(DRIVER_IST8310, AP_Compass_IST8310::probe(GET_I2C_DEVICE(i, HAL_COMPASS_IST8310_I2C_ADDR),
-                                                                  all_external, default_rotation));
+        for (uint8_t a=0; a<ARRAY_SIZE(ist8310_addr); a++) {
+            FOREACH_I2C_EXTERNAL(i) {
+                ADD_BACKEND(DRIVER_IST8310, AP_Compass_IST8310::probe(GET_I2C_DEVICE(i, ist8310_addr[a]),
+                                                                      true, default_rotation));
+            }
+            FOREACH_I2C_INTERNAL(i) {
+                ADD_BACKEND(DRIVER_IST8310, AP_Compass_IST8310::probe(GET_I2C_DEVICE(i, ist8310_addr[a]),
+                                                                      all_external, default_rotation));
+            }
         }
     }
 
@@ -786,7 +789,7 @@ void Compass::_detect_backends(void)
 
     case AP_BoardConfig::PX4_BOARD_PCNC1:
         ADD_BACKEND(DRIVER_BMM150,
-                    AP_Compass_BMM150::probe(GET_I2C_DEVICE(0, 0x10)));
+                    AP_Compass_BMM150::probe(GET_I2C_DEVICE(0, 0x10), ROTATION_NONE));
         break;
     case AP_BoardConfig::VRX_BOARD_BRAIN54: {
         // external i2c bus
