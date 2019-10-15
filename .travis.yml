@@ -32,6 +32,7 @@ cache:
     - $HOME/opt
 
 before_install:
+  - echo 0 | sudo dd of=/proc/sys/kernel/yama/ptrace_scope
   - Tools/scripts/configure-ci.sh
   - if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then export CI_CRON_JOB=1 ; fi
 
@@ -70,7 +71,10 @@ matrix:
       env: CI_BUILD_TARGET="sitltest-quadplane sitltest-plane"
     - if: type != cron
       compiler: "clang-7"
-      env: CI_BUILD_TARGET="sitltest-rover sitltest-sub""
+      env: CI_BUILD_TARGET="sitltest-rover sitltest-sub sitltest-balancebot"
+    - if: type != cron
+      compiler: "gcc"
+      env: CI_BUILD_TARGET="unit-tests"
     - if: type != cron
       compiler: "clang-7"
       env: CI_BUILD_TARGET="sitl""
