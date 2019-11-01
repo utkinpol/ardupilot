@@ -262,42 +262,42 @@ const AP_Param::Info Copter::var_info[] = {
     // @Param: FLTMODE1
     // @DisplayName: Flight Mode 1
     // @Description: Flight mode when Channel 5 pwm is <= 1230
-    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag
+    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag,25:SystemID
     // @User: Standard
     GSCALAR(flight_mode1, "FLTMODE1",               (uint8_t)FLIGHT_MODE_1),
 
     // @Param: FLTMODE2
     // @DisplayName: Flight Mode 2
     // @Description: Flight mode when Channel 5 pwm is >1230, <= 1360
-    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag
+    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag,25:SystemID
     // @User: Standard
     GSCALAR(flight_mode2, "FLTMODE2",               (uint8_t)FLIGHT_MODE_2),
 
     // @Param: FLTMODE3
     // @DisplayName: Flight Mode 3
     // @Description: Flight mode when Channel 5 pwm is >1360, <= 1490
-    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag
+    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag,25:SystemID
     // @User: Standard
     GSCALAR(flight_mode3, "FLTMODE3",               (uint8_t)FLIGHT_MODE_3),
 
     // @Param: FLTMODE4
     // @DisplayName: Flight Mode 4
     // @Description: Flight mode when Channel 5 pwm is >1490, <= 1620
-    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag
+    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag,25:SystemID
     // @User: Standard
     GSCALAR(flight_mode4, "FLTMODE4",               (uint8_t)FLIGHT_MODE_4),
 
     // @Param: FLTMODE5
     // @DisplayName: Flight Mode 5
     // @Description: Flight mode when Channel 5 pwm is >1620, <= 1749
-    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag
+    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag,25:SystemID
     // @User: Standard
     GSCALAR(flight_mode5, "FLTMODE5",               (uint8_t)FLIGHT_MODE_5),
 
     // @Param: FLTMODE6
     // @DisplayName: Flight Mode 6
     // @Description: Flight mode when Channel 5 pwm is >=1750
-    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag
+    // @Values: 0:Stabilize,1:Acro,2:AltHold,3:Auto,4:Guided,5:Loiter,6:RTL,7:Circle,9:Land,11:Drift,13:Sport,14:Flip,15:AutoTune,16:PosHold,17:Brake,18:Throw,19:Avoid_ADSB,20:Guided_NoGPS,21:Smart_RTL,22:FlowHold,23:Follow,24:ZigZag,25:SystemID
     // @User: Standard
     GSCALAR(flight_mode6, "FLTMODE6",               (uint8_t)FLIGHT_MODE_6),
 
@@ -934,6 +934,19 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_SUBGROUPINFO(oa, "OA_", 33, ParametersG2, AP_OAPathPlanner),
 #endif
 
+#if MODE_SYSTEMID_ENABLED == ENABLED
+    // @Group: SID
+    // @Path: mode_systemid.cpp
+    AP_SUBGROUPPTR(mode_systemid_ptr, "SID", 34, ParametersG2, ModeSystemId),
+#endif
+    
+    // @Param: FS_VIBE_ENABLE
+    // @DisplayName: Vibration Failsafe enable
+    // @Description: This enables the vibration failsafe which will use modified altitude estimation and control during high vibrations
+    // @Values: 0:Disabled, 1:Enabled
+    // @User: Standard
+    AP_GROUPINFO("FS_VIBE_ENABLE", 35, ParametersG2, fs_vibe_enabled, 1),
+
     AP_GROUPEND
 };
 
@@ -997,7 +1010,7 @@ ParametersG2::ParametersG2(void)
     , beacon(copter.serial_manager)
 #endif
 #if PROXIMITY_ENABLED == ENABLED
-    , proximity(copter.serial_manager)
+    , proximity()
 #endif
 #if ADVANCED_FAILSAFE == ENABLED
     ,afs(copter.mode_auto.mission)
@@ -1016,6 +1029,9 @@ ParametersG2::ParametersG2(void)
 #endif
 #if AUTOTUNE_ENABLED == ENABLED
     ,autotune_ptr(&copter.autotune)
+#endif
+#if MODE_SYSTEMID_ENABLED == ENABLED
+    ,mode_systemid_ptr(&copter.mode_systemid)
 #endif
 {
     AP_Param::setup_object_defaults(this, var_info);
@@ -1094,7 +1110,7 @@ void Copter::load_parameters(void)
 
 }
 
-// handle conversion of PID gains from Copter-3.3 to Copter-3.4
+// handle conversion of PID gains
 void Copter::convert_pid_parameters(void)
 {
     // conversion info
@@ -1124,6 +1140,7 @@ void Copter::convert_pid_parameters(void)
         { Parameters::k_param_pid_rate_yaw,   7, AP_PARAM_FLOAT, "ATC_RAT_YAW_ILMI" },
 #endif
     };
+    // conversion from Copter-3.3 to Copter-3.4
     const AP_Param::ConversionInfo angle_and_filt_conversion_info[] = {
         { Parameters::k_param_p_stabilize_roll, 0, AP_PARAM_FLOAT, "ATC_ANG_RLL_P" },
         { Parameters::k_param_p_stabilize_pitch, 0, AP_PARAM_FLOAT, "ATC_ANG_PIT_P" },
@@ -1140,7 +1157,7 @@ void Copter::convert_pid_parameters(void)
         { Parameters::k_param_pid_accel_z, 1, AP_PARAM_FLOAT, "PSC_ACCZ_I" },
         { Parameters::k_param_pid_accel_z, 2, AP_PARAM_FLOAT, "PSC_ACCZ_D" },
         { Parameters::k_param_pid_accel_z, 5, AP_PARAM_FLOAT, "PSC_ACCZ_IMAX" },
-        { Parameters::k_param_pid_accel_z, 6, AP_PARAM_FLOAT, "PSC_ACCZ_FILT" },
+        { Parameters::k_param_pid_accel_z, 6, AP_PARAM_FLOAT, "PSC_ACCZ_FLTE" },
         { Parameters::k_param_p_alt_hold, 0, AP_PARAM_FLOAT, "PSC_POSZ_P" },
         { Parameters::k_param_p_pos_xy, 0, AP_PARAM_FLOAT, "PSC_POSXY_P" },
     };
@@ -1217,7 +1234,8 @@ void Copter::convert_pid_parameters(void)
     AP_Param::set_defaults_from_table(heli_defaults_table, ARRAY_SIZE(heli_defaults_table));
 #endif
 
-    // attitude control filter parameter changes (from _FILT to FLTE or FLTD) for Copter-3.7
+    // attitude and position control filter parameter changes (from _FILT to FLTD, FLTE, FLTT) for Copter-4.0
+    // magic numbers shown below are discovered by setting AP_PARAM_KEY_DUMP = 1
     const AP_Param::ConversionInfo ff_and_filt_conversion_info[] = {
 #if FRAME_CONFIG == HELI_FRAME
         // tradheli moves ATC_RAT_RLL/PIT_FILT to FLTE, ATC_RAT_YAW_FILT to FLTE
@@ -1225,14 +1243,17 @@ void Copter::convert_pid_parameters(void)
         { Parameters::k_param_attitude_control, 387, AP_PARAM_FLOAT, "ATC_RAT_PIT_FLTE" },
         { Parameters::k_param_attitude_control, 388, AP_PARAM_FLOAT, "ATC_RAT_YAW_FLTE" },
 #else
-        // multicopters move ATC_RAT_RLL/PIT_FILT to FLTD, ATC_RAT_YAW_FILT to FLTE
+        // multicopters move ATC_RAT_RLL/PIT_FILT to FLTD & FLTT, ATC_RAT_YAW_FILT to FLTE
         { Parameters::k_param_attitude_control, 385, AP_PARAM_FLOAT, "ATC_RAT_RLL_FLTD" },
+        { Parameters::k_param_attitude_control, 385, AP_PARAM_FLOAT, "ATC_RAT_RLL_FLTT" },
         { Parameters::k_param_attitude_control, 386, AP_PARAM_FLOAT, "ATC_RAT_PIT_FLTD" },
+        { Parameters::k_param_attitude_control, 386, AP_PARAM_FLOAT, "ATC_RAT_PIT_FLTT" },
         { Parameters::k_param_attitude_control, 387, AP_PARAM_FLOAT, "ATC_RAT_YAW_FLTE" },
         { Parameters::k_param_attitude_control, 449, AP_PARAM_FLOAT, "ATC_RAT_RLL_FF" },
         { Parameters::k_param_attitude_control, 450, AP_PARAM_FLOAT, "ATC_RAT_PIT_FF" },
         { Parameters::k_param_attitude_control, 451, AP_PARAM_FLOAT, "ATC_RAT_YAW_FF" },
 #endif
+        { Parameters::k_param_pos_control, 388, AP_PARAM_FLOAT, "PSC_ACCZ_FLTE" },
     };
     uint8_t filt_table_size = ARRAY_SIZE(ff_and_filt_conversion_info);
     for (uint8_t i=0; i<filt_table_size; i++) {

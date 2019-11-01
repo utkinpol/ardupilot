@@ -30,28 +30,6 @@ enum autopilot_yaw_mode {
 #define HIL_MODE_DISABLED               0
 #define HIL_MODE_SENSORS                1
 
-enum mode_reason_t {
-    MODE_REASON_UNKNOWN=0,
-    MODE_REASON_TX_COMMAND,
-    MODE_REASON_GCS_COMMAND,
-    MODE_REASON_RADIO_FAILSAFE,
-    MODE_REASON_BATTERY_FAILSAFE,
-    MODE_REASON_GCS_FAILSAFE,
-    MODE_REASON_EKF_FAILSAFE,
-    MODE_REASON_GPS_GLITCH,
-    MODE_REASON_MISSION_END,
-    MODE_REASON_THROTTLE_LAND_ESCAPE,
-    MODE_REASON_FENCE_BREACH,
-    MODE_REASON_TERRAIN_FAILSAFE,
-    MODE_REASON_BRAKE_TIMEOUT,
-    MODE_REASON_FLIP_COMPLETE,
-    MODE_REASON_AVOIDANCE,
-    MODE_REASON_AVOIDANCE_RECOVERY,
-    MODE_REASON_THROW_COMPLETE,
-    MODE_REASON_TERMINATE,
-    MODE_REASON_TMODE,
-};
-
 // Tuning enumeration
 enum tuning_func {
     TUNING_NONE =                        0, //
@@ -94,7 +72,8 @@ enum tuning_func {
     TUNING_RATE_YAW_FF =                54, // body frame yaw rate controller FF term
     TUNING_RATE_MOT_YAW_HEADROOM =      55, // motors yaw headroom minimum
     TUNING_RATE_YAW_FILT =              56, // yaw rate input filter
-    TUNING_WINCH =                      57  // winch control (not actually a value to be tuned)
+    TUNING_WINCH =                      57, // winch control (not actually a value to be tuned)
+    TUNING_SYSTEM_ID_MAGNITUDE =        58  // magnitude of the system ID signal
 };
 
 // Acro Trainer types
@@ -189,6 +168,16 @@ enum LoggingParameters {
      LOG_HELI_MSG,
      LOG_PRECLAND_MSG,
      LOG_GUIDEDTARGET_MSG,
+     LOG_SYSIDD_MSG,
+     LOG_SYSIDS_MSG,
+};
+
+// Harmonic notch update mode
+enum HarmonicNotchDynamicMode {
+    HarmonicNotch_Fixed,
+    HarmonicNotch_UpdateThrottle,
+    HarmonicNotch_UpdateRPM,
+    HarmonicNotch_UpdateBLHeli,
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)

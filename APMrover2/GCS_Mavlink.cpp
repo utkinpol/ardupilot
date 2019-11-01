@@ -289,7 +289,7 @@ void Rover::send_wheel_encoder_distance(const mavlink_channel_t chan)
         for (uint8_t i = 0; i < g2.wheel_encoder.num_sensors(); i++) {
             distances[i] = wheel_encoder_last_distance_m[i];
         }
-        mavlink_msg_wheel_distance_send(chan, 1000UL * wheel_encoder_last_ekf_update_ms, g2.wheel_encoder.num_sensors(), distances);
+        mavlink_msg_wheel_distance_send(chan, 1000UL * AP_HAL::millis(), g2.wheel_encoder.num_sensors(), distances);
     }
 }
 
@@ -620,13 +620,13 @@ MAV_RESULT GCS_MAVLINK_Rover::handle_command_long_packet(const mavlink_command_l
     switch (packet.command) {
 
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:
-        if (rover.set_mode(rover.mode_rtl, MODE_REASON_GCS_COMMAND)) {
+        if (rover.set_mode(rover.mode_rtl, ModeReason::GCS_COMMAND)) {
             return MAV_RESULT_ACCEPTED;
         }
         return MAV_RESULT_FAILED;
 
     case MAV_CMD_MISSION_START:
-        if (rover.set_mode(rover.mode_auto, MODE_REASON_GCS_COMMAND)) {
+        if (rover.set_mode(rover.mode_auto, ModeReason::GCS_COMMAND)) {
             return MAV_RESULT_ACCEPTED;
         }
         return MAV_RESULT_FAILED;
@@ -1091,13 +1091,4 @@ void Rover::mavlink_delay_cb()
     }
 
     logger.EnableWrites(true);
-}
-
-bool GCS_MAVLINK_Rover::set_mode(const uint8_t mode)
-{
-    Mode *new_mode = rover.mode_from_mode_num((enum Mode::Number)mode);
-    if (new_mode == nullptr) {
-        return false;
-    }
-    return rover.set_mode(*new_mode, MODE_REASON_GCS_COMMAND);
 }

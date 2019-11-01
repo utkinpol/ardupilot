@@ -11,7 +11,7 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  * Code by Andrew Tridgell and Siddharth Bharat Purohit
  */
 #include <AP_HAL/AP_HAL.h>
@@ -133,7 +133,7 @@ void Util::set_imu_temp(float current)
     // average over temperatures to remove noise
     heater.count++;
     heater.sum += current;
-    
+
     // update once a second
     uint32_t now = AP_HAL::millis();
     if (now - heater.last_update_ms < 1000) {
@@ -158,14 +158,14 @@ void Util::set_imu_temp(float current)
 
     // limit to 65 degrees to prevent damage
     target = constrain_float(target, 0, 65);
-    
+
     float err = target - current;
 
     heater.integrator += kI * err;
     heater.integrator = constrain_float(heater.integrator, 0, 70);
 
     heater.output = constrain_float(kP * err + heater.integrator, 0, 100);
-    
+
     //hal.console->printf("integrator %.1f out=%.1f temp=%.2f err=%.2f\n", heater.integrator, heater.output, current, err);
 
 #if HAL_WITH_IO_MCU
@@ -226,51 +226,70 @@ uint64_t Util::get_hw_rtc() const
 
 #if !defined(HAL_NO_FLASH_SUPPORT) && !defined(HAL_NO_ROMFS_SUPPORT)
 
-bool Util::flash_bootloader()
+Util::FlashBootloader Util::flash_bootloader()
 {
     uint32_t fw_size;
     const char *fw_name = "bootloader.bin";
 
     EXPECT_DELAY_MS(11000);
 
-    uint8_t *fw = AP_ROMFS::find_decompress(fw_name, fw_size);
+    const uint8_t *fw = AP_ROMFS::find_decompress(fw_name, fw_size);
     if (!fw) {
         hal.console->printf("failed to find %s\n", fw_name);
-        return false;
+        return FlashBootloader::NOT_AVAILABLE;
     }
+    // make sure size is multiple of 32
+    fw_size = (fw_size + 31U) & ~31U;
 
     const uint32_t addr = hal.flash->getpageaddr(0);
     if (!memcmp(fw, (const void*)addr, fw_size)) {
         hal.console->printf("Bootloader up-to-date\n");
-        free(fw);
-        return true;
+        AP_ROMFS::free(fw);
+        return FlashBootloader::NO_CHANGE;
     }
 
     hal.console->printf("Erasing\n");
-    if (!hal.flash->erasepage(0)) {
-        hal.console->printf("Erase failed\n");
-        free(fw);
-        return false;
+    uint32_t erased_size = 0;
+    uint8_t erase_page = 0;
+    while (erased_size < fw_size) {
+        uint32_t page_size = hal.flash->getpagesize(erase_page);
+        if (page_size == 0) {
+            AP_ROMFS::free(fw);
+            return FlashBootloader::FAIL;
+        }
+        hal.scheduler->expect_delay_ms(1000);
+        if (!hal.flash->erasepage(erase_page)) {
+            hal.console->printf("Erase %u failed\n", erase_page);
+            AP_ROMFS::free(fw);
+            return FlashBootloader::FAIL;
+        }
+        erased_size += page_size;
+        erase_page++;
     }
+
     hal.console->printf("Flashing %s @%08x\n", fw_name, (unsigned int)addr);
     const uint8_t max_attempts = 10;
+    hal.flash->keep_unlocked(true);
     for (uint8_t i=0; i<max_attempts; i++) {
+        hal.scheduler->expect_delay_ms(1000);
         bool ok = hal.flash->write(addr, fw, fw_size);
         if (!ok) {
             hal.console->printf("Flash failed! (attempt=%u/%u)\n",
                                 i+1,
                                 max_attempts);
-            hal.scheduler->delay(1000);
+            hal.scheduler->delay(100);
             continue;
         }
         hal.console->printf("Flash OK\n");
-        free(fw);
-        return true;
+        hal.flash->keep_unlocked(false);
+        AP_ROMFS::free(fw);
+        return FlashBootloader::OK;
     }
 
+    hal.flash->keep_unlocked(false);
     hal.console->printf("Flash failed after %u attempts\n", max_attempts);
-    free(fw);
-    return false;
+    AP_ROMFS::free(fw);
+    return FlashBootloader::FAIL;
 }
 #endif // !HAL_NO_FLASH_SUPPORT && !HAL_NO_ROMFS_SUPPORT
 
@@ -281,16 +300,16 @@ bool Util::get_system_id(char buf[40])
 {
     uint8_t serialid[12];
     char board_name[14];
-    
+
     memcpy(serialid, (const void *)UDID_START, 12);
     strncpy(board_name, CHIBIOS_SHORT_BOARD_NAME, 13);
     board_name[13] = 0;
-    
+
     // this format is chosen to match the format used by HAL_PX4
     snprintf(buf, 40, "%s %02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X",
              board_name,
-             (unsigned)serialid[3], (unsigned)serialid[2], (unsigned)serialid[1], (unsigned)serialid[0], 
-             (unsigned)serialid[7], (unsigned)serialid[6], (unsigned)serialid[5], (unsigned)serialid[4], 
+             (unsigned)serialid[3], (unsigned)serialid[2], (unsigned)serialid[1], (unsigned)serialid[0],
+             (unsigned)serialid[7], (unsigned)serialid[6], (unsigned)serialid[5], (unsigned)serialid[4],
              (unsigned)serialid[11], (unsigned)serialid[10], (unsigned)serialid[9],(unsigned)serialid[8]);
     buf[39] = 0;
     return true;

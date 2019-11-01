@@ -142,8 +142,10 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK_CLASS(AP_Notify,            &copter.notify,              update,          50,  90),
     SCHED_TASK(one_hz_loop,            1,    100),
     SCHED_TASK(ekf_check,             10,     75),
+    SCHED_TASK(check_vibration,       10,     50),
     SCHED_TASK(gpsglitch_check,       10,     50),
     SCHED_TASK(landinggear_update,    10,     75),
+    SCHED_TASK(standby_update,        100,    75),
     SCHED_TASK(lost_vehicle_check,    10,     50),
     SCHED_TASK_CLASS(GCS,                  (GCS*)&copter._gcs,          update_receive, 400, 180),
     SCHED_TASK_CLASS(GCS,                  (GCS*)&copter._gcs,          update_send,    400, 550),
@@ -330,7 +332,7 @@ void Copter::update_batt_compass(void)
 // should be run at 400hz
 void Copter::fourhundred_hz_logging()
 {
-    if (should_log(MASK_LOG_ATTITUDE_FAST)) {
+    if (should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
         Log_Write_Attitude();
     }
 }
@@ -340,8 +342,11 @@ void Copter::fourhundred_hz_logging()
 void Copter::ten_hz_logging_loop()
 {
     // log attitude data if we're not already logging at the higher rate
-    if (should_log(MASK_LOG_ATTITUDE_MED) && !should_log(MASK_LOG_ATTITUDE_FAST)) {
+    if (should_log(MASK_LOG_ATTITUDE_MED) && !should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
         Log_Write_Attitude();
+    }
+    // log EKF attitude data
+    if (should_log(MASK_LOG_ATTITUDE_MED) || should_log(MASK_LOG_ATTITUDE_FAST)) {
         Log_Write_EKF_POS();
     }
     if (should_log(MASK_LOG_MOTBATT)) {

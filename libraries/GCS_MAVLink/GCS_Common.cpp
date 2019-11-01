@@ -290,7 +290,7 @@ void GCS_MAVLINK::send_distance_sensor() const
     AP_Proximity *proximity = AP_Proximity::get_singleton();
     if (proximity != nullptr) {
         for (uint8_t i = 0; i < proximity->num_sensors(); i++) {
-            if (proximity->get_type(i) == AP_Proximity::Proximity_Type_RangeFinder) {
+            if (proximity->get_type(i) == AP_Proximity::Type::RangeFinder) {
                 filter_possible_proximity_sensors = true;
             }
         }
@@ -342,7 +342,7 @@ void GCS_MAVLINK::send_proximity() const
     const uint16_t dist_max = (uint16_t)(proximity->distance_max() * 100.0f); // maximum distance the sensor can measure in centimeters
 
     // send horizontal distances
-    if (proximity->get_status() == AP_Proximity::Proximity_Good) {
+    if (proximity->get_status() == AP_Proximity::Status::Good) {
         AP_Proximity::Proximity_Distance_Array dist_array;
         if (proximity->get_horizontal_distances(dist_array)) {
             for (uint8_t i = 0; i < PROXIMITY_MAX_DIRECTION; i++) {
@@ -2013,7 +2013,7 @@ MAV_RESULT GCS_MAVLINK::_set_mode_common(const MAV_MODE _base_mode, const uint32
     MAV_RESULT result = MAV_RESULT_UNSUPPORTED;
     // only accept custom modes because there is no easy mapping from Mavlink flight modes to AC flight modes
     if (_base_mode & MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) {
-        if (set_mode(_custom_mode)) {
+        if (AP::vehicle()->set_mode(_custom_mode, ModeReason::GCS_COMMAND)) {
             result = MAV_RESULT_ACCEPTED;
         }
     } else if (_base_mode == (MAV_MODE)MAV_MODE_FLAG_DECODE_POSITION_SAFETY) {
@@ -3274,7 +3274,7 @@ MAV_RESULT GCS_MAVLINK::handle_command_flash_bootloader(const mavlink_command_lo
         return MAV_RESULT_FAILED;
     }
 
-    if (!hal.util->flash_bootloader()) {
+    if (hal.util->flash_bootloader() != AP_HAL::Util::FlashBootloader::OK) {
         return MAV_RESULT_FAILED;
     }
 

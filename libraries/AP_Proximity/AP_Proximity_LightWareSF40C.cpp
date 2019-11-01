@@ -27,10 +27,10 @@ extern const AP_HAL::HAL& hal;
    already know that we should setup the proximity sensor
 */
 AP_Proximity_LightWareSF40C::AP_Proximity_LightWareSF40C(AP_Proximity &_frontend,
-                                                         AP_Proximity::Proximity_State &_state,
-                                                         AP_SerialManager &serial_manager) :
+                                                         AP_Proximity::Proximity_State &_state) :
     AP_Proximity_Backend(_frontend, _state)
 {
+    const AP_SerialManager &serial_manager = AP::serialmanager();
     uart = serial_manager.find_serial(AP_SerialManager::SerialProtocol_Lidar360, 0);
     if (uart != nullptr) {
         uart->begin(serial_manager.find_baudrate(AP_SerialManager::SerialProtocol_Lidar360, 0));
@@ -38,9 +38,9 @@ AP_Proximity_LightWareSF40C::AP_Proximity_LightWareSF40C(AP_Proximity &_frontend
 }
 
 // detect if a Lightware proximity sensor is connected by looking for a configured serial port
-bool AP_Proximity_LightWareSF40C::detect(AP_SerialManager &serial_manager)
+bool AP_Proximity_LightWareSF40C::detect()
 {
-    return serial_manager.find_serial(AP_SerialManager::SerialProtocol_Lidar360, 0) != nullptr;
+    return AP::serialmanager().find_serial(AP_SerialManager::SerialProtocol_Lidar360, 0) != nullptr;
 }
 
 // update the state of the sensor
@@ -63,9 +63,9 @@ void AP_Proximity_LightWareSF40C::update(void)
 
     // check for timeout and set health status
     if ((_last_distance_received_ms == 0) || (AP_HAL::millis() - _last_distance_received_ms > PROXIMITY_SF40C_TIMEOUT_MS)) {
-        set_status(AP_Proximity::Proximity_NoData);
+        set_status(AP_Proximity::Status::NoData);
     } else {
-        set_status(AP_Proximity::Proximity_Good);
+        set_status(AP_Proximity::Status::Good);
     }
 }
 
@@ -408,8 +408,8 @@ bool AP_Proximity_LightWareSF40C::process_reply()
 
         case RequestType_DistanceMeasurement:
         {
-            float angle_deg = (float)atof(element_buf[0]);
-            float distance_m = (float)atof(element_buf[1]);
+            float angle_deg = strtof(element_buf[0], NULL);
+            float distance_m = strtof(element_buf[1], NULL);
             uint8_t sector;
             if (convert_angle_to_sector(angle_deg, sector)) {
                 _angle[sector] = angle_deg;
