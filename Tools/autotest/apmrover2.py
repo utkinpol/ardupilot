@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import copy
 import os
+import shutil
 import sys
 import time
 
@@ -4621,6 +4622,132 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             target_component=target_component,
         )
 
+    def script_source_path(self, scriptname):
+        return os.path.join(self.rootdir(), "libraries", "AP_Scripting", "examples", scriptname)
+
+    def installed_script_path(self, scriptname):
+        return os.path.join(self.rootdir(), "scripts", scriptname)
+
+    def install_example_script(self, scriptname):
+        source = self.script_source_path(scriptname)
+        dest = self.installed_script_path(scriptname)
+        destdir = os.path.dirname(dest)
+        if not os.path.exists(destdir):
+            os.mkdir(destdir)
+        self.progress("Copying (%s) to (%s)" % (source, dest))
+        shutil.copy(source, dest)
+
+    def remove_example_script(self, scriptname):
+        dest = self.installed_script_path(scriptname)
+        try:
+            os.unlink(dest)
+        except IOError:
+            pass
+        except OSError:
+            pass
+
+    def test_scripting_simple_loop(self):
+        self.start_subtest("Scripting simple loop")
+        ex = None
+        example_script = "simple_loop.lua"
+        messages = []
+        def my_message_hook(mav, m):
+            if m.get_type() != 'STATUSTEXT':
+                return
+            messages.append(m)
+        self.install_message_hook(my_message_hook)
+        try:
+            self.set_parameter("SCR_ENABLE", 1)
+            self.install_example_script(example_script)
+            self.reboot_sitl()
+            self.delay_sim_time(10)
+        except Exception as e:
+            ex = e
+        self.remove_example_script(example_script)
+        self.reboot_sitl()
+
+        self.remove_message_hook(my_message_hook)
+
+        if ex is not None:
+            raise ex
+
+        # check all messages to see if we got our message
+        count = 0
+        for m in messages:
+            if "hello, world" in m.text:
+                count += 1
+        self.progress("Got %u hellos" % count)
+        if count < 3:
+            raise NotAchievedException("Expected at least three hellos")
+
+    def test_scripting_internal_test(self):
+        self.start_subtest("Scripting internal test")
+        ex = None
+        example_script = "scripting_test.lua"
+        messages = []
+        def my_message_hook(mav, m):
+            if m.get_type() != 'STATUSTEXT':
+                return
+            messages.append(m)
+        self.install_message_hook(my_message_hook)
+        try:
+            self.set_parameter("SCR_ENABLE", 1)
+            self.set_parameter("SCR_HEAP_SIZE", 65536) # this is more heap then we need, but this script will keep getting bigger
+            self.install_example_script(example_script)
+            self.reboot_sitl()
+            self.delay_sim_time(10)
+        except Exception as e:
+            ex = e
+        self.remove_example_script(example_script)
+        self.reboot_sitl()
+
+        self.remove_message_hook(my_message_hook)
+
+        if ex is not None:
+            raise ex
+
+        # check all messages to see if we got our message
+        success = False
+        for m in messages:
+            if "Internal tests passed" in m.text:
+                success = True
+        self.progress("Success")
+        if not success :
+            raise NotAchievedException("Scripting internal test failed")
+
+    def test_scripting_hello_world(self):
+        self.start_subtest("Scripting hello world")
+        ex = None
+        example_script = "hello_world.lua"
+        messages = []
+        def my_message_hook(mav, m):
+            if m.get_type() != 'STATUSTEXT':
+                return
+            messages.append(m)
+        self.install_message_hook(my_message_hook)
+        try:
+            self.set_parameter("SCR_ENABLE", 1)
+            self.install_example_script(example_script)
+            self.reboot_sitl()
+        except Exception as e:
+            ex = e
+        self.remove_example_script(example_script)
+        self.reboot_sitl()
+
+        self.remove_message_hook(my_message_hook)
+
+        if ex is not None:
+            raise ex
+
+        # check all messages to see if we got our message
+        for m in messages:
+            if "hello, world" in m.text:
+                return # success!
+        raise NotAchievedException("Did not get expected text")
+
+    def test_scripting(self):
+        self.test_scripting_hello_world()
+        self.test_scripting_simple_loop()
 
     def tests(self):
         '''return list of all tests'''
@@ -4775,6 +4902,10 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             ("PolyFenceObjectAvoidanceBendyRulerEasier",
              "PolyFence object avoidance tests - easier bendy ruler test",
              self.test_poly_fence_object_avoidance_bendy_ruler_easier),
+
+            ("Scripting",
+             "Scripting test",
+             self.test_scripting),
 
             ("DownLoadLogs", "Download logs", lambda:
              self.log_download(

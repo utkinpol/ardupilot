@@ -338,8 +338,9 @@ void RangeFinder::update(void)
             drivers[i]->update();
         }
     }
-
+#ifndef HAL_BUILD_AP_PERIPH
     Log_RFND();
+#endif
 }
 
 bool RangeFinder::_add_backend(AP_RangeFinder_Backend *backend)
@@ -430,11 +431,13 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         break;
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
     case RangeFinder_TYPE_PX4_PWM:
+#ifndef HAL_BUILD_AP_PERIPH
         // to ease moving from PX4 to ChibiOS we'll lie a little about
         // the backend driver...
         if (AP_RangeFinder_PWM::detect()) {
             drivers[instance] = new AP_RangeFinder_PWM(state[instance], params[instance], estimated_terrain_height);
         }
+#endif
         break;
 #endif
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
@@ -468,9 +471,11 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         break;
 #endif
     case RangeFinder_TYPE_MAVLink:
+#ifndef HAL_BUILD_AP_PERIPH
         if (AP_RangeFinder_MAVLink::detect()) {
             drivers[instance] = new AP_RangeFinder_MAVLink(state[instance], params[instance]);
         }
+#endif
         break;
     case RangeFinder_TYPE_MBSER:
         if (AP_RangeFinder_MaxsonarSerialLV::detect(serial_instance)) {
@@ -478,10 +483,12 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         }
         break;
     case RangeFinder_TYPE_ANALOG:
+#ifndef HAL_BUILD_AP_PERIPH
         // note that analog will always come back as present if the pin is valid
         if (AP_RangeFinder_analog::detect(params[instance])) {
             drivers[instance] = new AP_RangeFinder_analog(state[instance], params[instance]);
         }
+#endif
         break;
     case RangeFinder_TYPE_NMEA:
         if (AP_RangeFinder_NMEA::detect(serial_instance)) {
@@ -509,9 +516,11 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         }
         break;
     case RangeFinder_TYPE_PWM:
+#ifndef HAL_BUILD_AP_PERIPH
         if (AP_RangeFinder_PWM::detect()) {
             drivers[instance] = new AP_RangeFinder_PWM(state[instance], params[instance], estimated_terrain_height);
         }
+#endif
         break;
     case RangeFinder_TYPE_BLPing:
         if (AP_RangeFinder_BLPing::detect(serial_instance)) {
@@ -575,15 +584,22 @@ bool RangeFinder::has_orientation(enum Rotation orientation) const
 // find first range finder instance with the specified orientation
 AP_RangeFinder_Backend *RangeFinder::find_instance(enum Rotation orientation) const
 {
+    // first try for a rangefinder that is in range
     for (uint8_t i=0; i<num_instances; i++) {
         AP_RangeFinder_Backend *backend = get_backend(i);
-        if (backend == nullptr) {
-            continue;
+        if (backend != nullptr &&
+            backend->orientation() == orientation &&
+            backend->status() == RangeFinder_Good) {
+            return backend;
         }
-        if (backend->orientation() != orientation) {
-            continue;
+    }
+    // if none in range then return first with correct orientation
+    for (uint8_t i=0; i<num_instances; i++) {
+        AP_RangeFinder_Backend *backend = get_backend(i);
+        if (backend != nullptr &&
+            backend->orientation() == orientation) {
+            return backend;
         }
-        return backend;
     }
     return nullptr;
 }

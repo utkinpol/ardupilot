@@ -1,6 +1,7 @@
 // auto generated bindings, don't manually edit
 #include "lua_generated_bindings.h"
 #include "lua_boxed_numerics.h"
+#include <AP_Vehicle/AP_Vehicle.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Relay/AP_Relay.h>
 #include <AP_Terrain/AP_Terrain.h>
@@ -389,6 +390,41 @@ static int Vector3f___sub(lua_State *L) {
     return 1;
 }
 
+static int Location_get_distance_NE(lua_State *L) {
+    binding_argcheck(L, 2);
+    Location * ud = check_Location(L, 1);
+    Location & data_2 = *check_Location(L, 2);
+    const Vector2f &data = ud->get_distance_NE(
+            data_2);
+
+    new_Vector2f(L);
+    *check_Vector2f(L, -1) = data;
+    return 1;
+}
+
+static int Location_get_distance_NED(lua_State *L) {
+    binding_argcheck(L, 2);
+    Location * ud = check_Location(L, 1);
+    Location & data_2 = *check_Location(L, 2);
+    const Vector3f &data = ud->get_distance_NED(
+            data_2);
+
+    new_Vector3f(L);
+    *check_Vector3f(L, -1) = data;
+    return 1;
+}
+
+static int Location_get_bearing(lua_State *L) {
+    binding_argcheck(L, 2);
+    Location * ud = check_Location(L, 1);
+    Location & data_2 = *check_Location(L, 2);
+    const float data = ud->get_bearing(
+            data_2);
+
+    lua_pushnumber(L, data);
+    return 1;
+}
+
 static int Location_get_vector_from_origin_NEU(lua_State *L) {
     binding_argcheck(L, 1);
     Location * ud = check_Location(L, 1);
@@ -466,11 +502,32 @@ const luaL_Reg Location_meta[] = {
     {"relative_alt", Location_relative_alt},
     {"lng", Location_lng},
     {"lat", Location_lat},
+    {"get_distance_NE", Location_get_distance_NE},
+    {"get_distance_NED", Location_get_distance_NED},
+    {"get_bearing", Location_get_bearing},
     {"get_vector_from_origin_NEU", Location_get_vector_from_origin_NEU},
     {"offset", Location_offset},
     {"get_distance", Location_get_distance},
     {NULL, NULL}
 };
+
+static int AP_Vehicle_set_mode(lua_State *L) {
+    AP_Vehicle * ud = AP_Vehicle::get_singleton();
+    if (ud == nullptr) {
+        return luaL_argerror(L, 1, "vehicle not supported on this firmware");
+    }
+
+    binding_argcheck(L, 2);
+    const lua_Integer raw_data_2 = luaL_checkinteger(L, 2);
+    luaL_argcheck(L, ((raw_data_2 >= MAX(0, 0)) && (raw_data_2 <= MIN(UINT8_MAX, UINT8_MAX))), 2, "argument out of range");
+    const uint8_t data_2 = static_cast<uint8_t>(raw_data_2);
+    const bool data = ud->set_mode(
+            data_2,
+            ModeReason::SCRIPTING);
+
+    lua_pushboolean(L, data);
+    return 1;
+}
 
 static int GCS_set_message_interval(lua_State *L) {
     GCS * ud = GCS::get_singleton();
@@ -688,7 +745,7 @@ static int RangeFinder_num_sensors(lua_State *L) {
 static int AP_Notify_play_tune(lua_State *L) {
     AP_Notify * ud = AP_Notify::get_singleton();
     if (ud == nullptr) {
-        return luaL_argerror(L, 1, "AP_Notify not supported on this firmware");
+        return luaL_argerror(L, 1, "notify not supported on this firmware");
     }
 
     binding_argcheck(L, 2);
@@ -1065,7 +1122,7 @@ static int AP_BattMonitor_get_temperature(lua_State *L) {
 
     binding_argcheck(L, 2);
     float data_5002 = {};
-    const lua_Integer raw_data_3 = luaL_checkinteger(L, 3);
+    const lua_Integer raw_data_3 = luaL_checkinteger(L, 2);
     luaL_argcheck(L, ((raw_data_3 >= MAX(0, 0)) && (raw_data_3 <= MIN(ud->num_instances(), UINT8_MAX))), 3, "argument out of range");
     const uint8_t data_3 = static_cast<uint8_t>(raw_data_3);
     const bool data = ud->get_temperature(
@@ -1152,7 +1209,7 @@ static int AP_BattMonitor_consumed_wh(lua_State *L) {
 
     binding_argcheck(L, 2);
     float data_5002 = {};
-    const lua_Integer raw_data_3 = luaL_checkinteger(L, 3);
+    const lua_Integer raw_data_3 = luaL_checkinteger(L, 2);
     luaL_argcheck(L, ((raw_data_3 >= MAX(0, 0)) && (raw_data_3 <= MIN(ud->num_instances(), UINT8_MAX))), 3, "argument out of range");
     const uint8_t data_3 = static_cast<uint8_t>(raw_data_3);
     const bool data = ud->consumed_wh(
@@ -1175,7 +1232,7 @@ static int AP_BattMonitor_consumed_mah(lua_State *L) {
 
     binding_argcheck(L, 2);
     float data_5002 = {};
-    const lua_Integer raw_data_3 = luaL_checkinteger(L, 3);
+    const lua_Integer raw_data_3 = luaL_checkinteger(L, 2);
     luaL_argcheck(L, ((raw_data_3 >= MAX(0, 0)) && (raw_data_3 <= MIN(ud->num_instances(), UINT8_MAX))), 3, "argument out of range");
     const uint8_t data_3 = static_cast<uint8_t>(raw_data_3);
     const bool data = ud->consumed_mah(
@@ -1198,7 +1255,7 @@ static int AP_BattMonitor_current_amps(lua_State *L) {
 
     binding_argcheck(L, 2);
     float data_5002 = {};
-    const lua_Integer raw_data_3 = luaL_checkinteger(L, 3);
+    const lua_Integer raw_data_3 = luaL_checkinteger(L, 2);
     luaL_argcheck(L, ((raw_data_3 >= MAX(0, 0)) && (raw_data_3 <= MIN(ud->num_instances(), UINT8_MAX))), 3, "argument out of range");
     const uint8_t data_3 = static_cast<uint8_t>(raw_data_3);
     const bool data = ud->current_amps(
@@ -1542,6 +1599,11 @@ static int AP_AHRS_get_roll(lua_State *L) {
     return 1;
 }
 
+const luaL_Reg AP_Vehicle_meta[] = {
+    {"set_mode", AP_Vehicle_set_mode},
+    {NULL, NULL}
+};
+
 const luaL_Reg GCS_meta[] = {
     {"set_message_interval", GCS_set_message_interval},
     {"send_text", GCS_send_text},
@@ -1572,10 +1634,6 @@ const luaL_Reg RangeFinder_meta[] = {
 
 const luaL_Reg AP_Notify_meta[] = {
     {"play_tune", AP_Notify_play_tune},
-    {NULL, NULL}
-};
-
-const luaL_Reg notify_meta[] = {
     {NULL, NULL}
 };
 
@@ -1677,12 +1735,12 @@ const struct userdata_meta userdata_fun[] = {
 };
 
 const struct userdata_meta singleton_fun[] = {
+    {"vehicle", AP_Vehicle_meta, NULL},
     {"gcs", GCS_meta, NULL},
     {"relay", AP_Relay_meta, NULL},
     {"terrain", AP_Terrain_meta, AP_Terrain_enums},
     {"rangefinder", RangeFinder_meta, NULL},
-    {"AP_Notify", AP_Notify_meta, NULL},
-    {"notify", notify_meta, NULL},
+    {"notify", AP_Notify_meta, NULL},
     {"gps", AP_GPS_meta, AP_GPS_enums},
     {"battery", AP_BattMonitor_meta, NULL},
     {"arming", AP_Arming_meta, NULL},
@@ -1728,11 +1786,11 @@ void load_generated_bindings(lua_State *L) {
 }
 
 const char *singletons[] = {
+    "vehicle",
     "gcs",
     "relay",
     "terrain",
     "rangefinder",
-    "AP_Notify",
     "notify",
     "gps",
     "battery",

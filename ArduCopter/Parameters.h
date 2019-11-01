@@ -604,6 +604,14 @@ public:
     // object avoidance path planning
     AP_OAPathPlanner oa;
 #endif
+
+#if MODE_SYSTEMID_ENABLED == ENABLED
+    // we need a pointer to the mode for the G2 table
+    void *mode_systemid_ptr;
+#endif
+
+    // vibration failsafe enable/disable
+    AP_Int8 fs_vibe_enabled;
 };
 
 extern const AP_Param::Info        var_info[];

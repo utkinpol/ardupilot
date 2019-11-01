@@ -301,14 +301,33 @@ AP_GPS::AP_GPS()
     _singleton = this;
 }
 
+// return true if a specific type of GPS uses a UART
+bool AP_GPS::needs_uart(GPS_Type type) const
+{
+    switch (type) {
+    case GPS_TYPE_NONE:
+    case GPS_TYPE_HIL:
+    case GPS_TYPE_UAVCAN:
+    case GPS_TYPE_MAV:
+        return false;
+    default:
+        break;
+    }
+    return true;
+}
+
 /// Startup initialisation.
 void AP_GPS::init(const AP_SerialManager& serial_manager)
 {
     primary_instance = 0;
 
     // search for serial ports with gps protocol
+    uint8_t uart_idx = 0;
     for (uint8_t i=0; i<GPS_MAX_RECEIVERS; i++) {
-        _port[i] = serial_manager.find_serial(AP_SerialManager::SerialProtocol_GPS, i);
+        if (needs_uart((GPS_Type)_type[i].get())) {
+            _port[i] = serial_manager.find_serial(AP_SerialManager::SerialProtocol_GPS, uart_idx);
+            uart_idx++;
+        }
     }
     _last_instance_swap_ms = 0;
 
@@ -941,21 +960,6 @@ void AP_GPS::inject_data(uint8_t instance, uint8_t *data, uint16_t len)
 
 void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
 {
-    static uint32_t last_send_time_ms[MAVLINK_COMM_NUM_BUFFERS];
-    if (status(0) > AP_GPS::NO_GPS) {
-        // when we have a GPS then only send new data
-        if (last_send_time_ms[chan] == last_message_time_ms(0)) {
-            return;
-        }
-        last_send_time_ms[chan] = last_message_time_ms(0);
-    } else {
-        // when we don't have a GPS then send at 1Hz
-        uint32_t now = AP_HAL::millis();
-        if (now - last_send_time_ms[chan] < 1000) {
-            return;
-        }
-        last_send_time_ms[chan] = now;
-    }
     const Location &loc = location(0);
     float hacc = 0.0f;
     float vacc = 0.0f;
@@ -985,15 +989,9 @@ void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
 #if GPS_MAX_RECEIVERS > 1
 void AP_GPS::send_mavlink_gps2_raw(mavlink_channel_t chan)
 {
-    static uint32_t last_send_time_ms[MAVLINK_COMM_NUM_BUFFERS];
     if (num_instances < 2 || status(1) <= AP_GPS::NO_GPS) {
         return;
     }
-    // when we have a GPS then only send new data
-    if (last_send_time_ms[chan] == last_message_time_ms(1)) {
-        return;
-    }
-    last_send_time_ms[chan] = last_message_time_ms(1);
 
     const Location &loc = location(1);
     mavlink_msg_gps2_raw_send(

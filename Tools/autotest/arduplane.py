@@ -545,6 +545,56 @@ class AutoTestPlane(AutoTest):
 
         self.fly_home_land_and_disarm()
 
+    def fly_deepstall(self):
+#        self.fly_deepstall_absolute()
+        self.fly_deepstall_relative()
+
+    def fly_deepstall_absolute(self):
+        self.start_subtest("DeepStall Relative Absolute")
+        self.set_parameter("LAND_TYPE", 1)
+        deepstall_elevator_pwm = 1661
+        self.set_parameter("LAND_DS_ELEV_PWM", deepstall_elevator_pwm)
+        self.load_mission("plane-deepstall-mission.txt")
+        self.change_mode("AUTO")
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.progress("Waiting for deepstall messages")
+
+        self.wait_text("Deepstall: Entry: ", timeout=240)
+
+        # assume elevator is on channel 2:
+        self.wait_servo_channel_value(2, deepstall_elevator_pwm)
+
+        self.disarm_wait(timeout=120)
+
+        self.progress("Flying home")
+        self.takeoff(10)
+        self.set_parameter("LAND_TYPE", 0)
+        self.fly_home_land_and_disarm()
+
+    def fly_deepstall_relative(self):
+        self.start_subtest("DeepStall Relative")
+        self.set_parameter("LAND_TYPE", 1)
+        deepstall_elevator_pwm = 1661
+        self.set_parameter("LAND_DS_ELEV_PWM", deepstall_elevator_pwm)
+        self.load_mission("plane-deepstall-relative-mission.txt")
+        self.change_mode("AUTO")
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.progress("Waiting for deepstall messages")
+
+        self.wait_text("Deepstall: Entry: ", timeout=240)
+
+        # assume elevator is on channel 2:
+        self.wait_servo_channel_value(2, deepstall_elevator_pwm)
+
+        self.disarm_wait(timeout=120)
+
+        self.progress("Flying home")
+        self.takeoff(10)
+        self.set_parameter("LAND_TYPE", 0)
+        self.fly_home_land_and_disarm()
+
     def fly_do_change_speed(self):
         # the following lines ensure we revert these parameter values
         # - DO_CHANGE_AIRSPEED is a permanent vehicle change!
@@ -1331,7 +1381,7 @@ class AutoTestPlane(AutoTest):
         # message ADSB_VEHICLE 37 -353632614 1491652305 0 584070 0 0 0 "bob" 3 1 255 17
         self.set_parameter("ADSB_ENABLE", 1)
         self.set_parameter("AVD_ENABLE", 1)
-        self.delay_sim_time(1) # TODO: work out why this is required...
+        self.delay_sim_time(2) # TODO: work out why this is required...
         self.mav.mav.adsb_vehicle_send(37, # ICAO address
                                        int(here.lat * 1e7),
                                        int(here.lng * 1e7),
@@ -1347,7 +1397,7 @@ class AutoTestPlane(AutoTest):
                                        17 # squawk
         )
         self.progress("Waiting for collision message")
-        m = self.mav.recv_match(type='COLLISION', blocking=True, timeout=2)
+        m = self.mav.recv_match(type='COLLISION', blocking=True, timeout=4)
         if m is None:
             raise NotAchievedException("Did not get collision message")
         if m.threat_level != 2:
@@ -1417,6 +1467,10 @@ class AutoTestPlane(AutoTest):
             ("AdvancedFailsafe",
              "Test Advanced Failsafe",
              self.test_advanced_failsafe),
+
+            ("DeepStall",
+             "Test DeepStall Landing",
+             self.fly_deepstall),
 
             ("LogDownLoad",
              "Log download",

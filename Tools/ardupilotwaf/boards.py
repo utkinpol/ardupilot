@@ -124,7 +124,6 @@ class Board:
             '-Werror=overflow',
             '-Werror=parentheses',
             '-Werror=format-extra-args',
-            '-Werror=delete-non-virtual-dtor',
             '-Werror=ignored-qualifiers',
         ]
 
@@ -191,6 +190,7 @@ class Board:
             '-Werror=unused-result',
             '-Werror=shadow',
             '-Werror=unused-variable',
+            '-Werror=delete-non-virtual-dtor',
             '-Wfatal-errors',
             '-Wno-trigraphs',
             '-Werror=parentheses',
@@ -293,7 +293,7 @@ class Board:
         '''embed some files using AP_ROMFS'''
         import embed
         header = ctx.bldnode.make_node('ap_romfs_embedded.h').abspath()
-        if not embed.create_embedded_h(header, ctx.env.ROMFS_FILES):
+        if not embed.create_embedded_h(header, ctx.env.ROMFS_FILES, ctx.env.ROMFS_UNCOMPRESSED):
             ctx.fatal("Failed to created ap_romfs_embedded.h")
 
 Board = BoardMeta('Board', Board.__bases__, dict(Board.__dict__))
