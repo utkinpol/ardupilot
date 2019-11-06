@@ -51,7 +51,7 @@ class AP_Mount
     friend class AP_Mount_SToRM32_serial;
 
 public:
-    AP_Mount(const struct Location &current_loc);
+    AP_Mount();
 
     /* Do not allow copies */
     AP_Mount(const AP_Mount &other) = delete;
@@ -129,9 +129,6 @@ protected:
 
     static AP_Mount *_singleton;
 
-    // private members
-    const struct Location   &_current_loc;  // reference to the vehicle's current location
-
     // frontend parameters
     AP_Int8             _joystick_speed;    // joystick gain
 
@@ -170,6 +167,7 @@ protected:
 
         MAV_MOUNT_MODE  _mode;              // current mode (see MAV_MOUNT_MODE enum)
         struct Location _roi_target;        // roi target location
+        uint32_t _roi_target_set_ms;
     } state[AP_MOUNT_MAX_INSTANCES];
 
 private:
