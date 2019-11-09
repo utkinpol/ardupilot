@@ -48,56 +48,56 @@ public:
     RangeFinder &operator=(const RangeFinder&) = delete;
 
     // RangeFinder driver types
-    enum RangeFinder_Type {
-        RangeFinder_TYPE_NONE   = 0,
-        RangeFinder_TYPE_ANALOG = 1,
-        RangeFinder_TYPE_MBI2C  = 2,
-        RangeFinder_TYPE_PLI2C  = 3,
-        RangeFinder_TYPE_PX4    = 4,
-        RangeFinder_TYPE_PX4_PWM= 5,
-        RangeFinder_TYPE_BBB_PRU= 6,
-        RangeFinder_TYPE_LWI2C  = 7,
-        RangeFinder_TYPE_LWSER  = 8,
-        RangeFinder_TYPE_BEBOP  = 9,
-        RangeFinder_TYPE_MAVLink = 10,
-        RangeFinder_TYPE_ULANDING= 11,
-        RangeFinder_TYPE_LEDDARONE = 12,
-        RangeFinder_TYPE_MBSER  = 13,
-        RangeFinder_TYPE_TRI2C  = 14,
-        RangeFinder_TYPE_PLI2CV3= 15,
-        RangeFinder_TYPE_VL53L0X = 16,
-        RangeFinder_TYPE_NMEA = 17,
-        RangeFinder_TYPE_WASP = 18,
-        RangeFinder_TYPE_BenewakeTF02 = 19,
-        RangeFinder_TYPE_BenewakeTFmini = 20,
-        RangeFinder_TYPE_PLI2CV3HP = 21,
-        RangeFinder_TYPE_PWM = 22,
-        RangeFinder_TYPE_BLPing = 23,
-        RangeFinder_TYPE_UAVCAN = 24,
-        RangeFinder_TYPE_BenewakeTFminiPlus = 25,
-        RangeFinder_TYPE_Lanbao = 26,
-        RangeFinder_TYPE_BenewakeTF03 = 27,
+    enum class Type {
+        NONE   = 0,
+        ANALOG = 1,
+        MBI2C  = 2,
+        PLI2C  = 3,
+        PX4    = 4,
+        PX4_PWM= 5,
+        BBB_PRU= 6,
+        LWI2C  = 7,
+        LWSER  = 8,
+        BEBOP  = 9,
+        MAVLink = 10,
+        ULANDING= 11,
+        LEDDARONE = 12,
+        MBSER  = 13,
+        TRI2C  = 14,
+        PLI2CV3= 15,
+        VL53L0X = 16,
+        NMEA = 17,
+        WASP = 18,
+        BenewakeTF02 = 19,
+        BenewakeTFmini = 20,
+        PLI2CV3HP = 21,
+        PWM = 22,
+        BLPing = 23,
+        UAVCAN = 24,
+        BenewakeTFminiPlus = 25,
+        Lanbao = 26,
+        BenewakeTF03 = 27,
     };
 
-    enum RangeFinder_Function {
-        FUNCTION_LINEAR    = 0,
-        FUNCTION_INVERTED  = 1,
-        FUNCTION_HYPERBOLA = 2
+    enum class Function {
+        LINEAR    = 0,
+        INVERTED  = 1,
+        HYPERBOLA = 2
     };
 
-    enum RangeFinder_Status {
-        RangeFinder_NotConnected = 0,
-        RangeFinder_NoData,
-        RangeFinder_OutOfRangeLow,
-        RangeFinder_OutOfRangeHigh,
-        RangeFinder_Good
+    enum class Status {
+        NotConnected = 0,
+        NoData,
+        OutOfRangeLow,
+        OutOfRangeHigh,
+        Good
     };
 
     // The RangeFinder_State structure is filled in by the backend driver
     struct RangeFinder_State {
         uint16_t distance_cm;           // distance: in cm
         uint16_t voltage_mv;            // voltage in millivolts, if applicable, otherwise 0
-        enum RangeFinder_Status status; // sensor status
+        enum RangeFinder::Status status; // sensor status
         uint8_t  range_valid_count;     // number of consecutive valid readings (maxes out at 10)
         uint32_t last_reading_ms;       // system time of last successful update from sensor
 
@@ -145,7 +145,7 @@ public:
     int16_t min_distance_cm_orient(enum Rotation orientation) const;
     int16_t ground_clearance_cm_orient(enum Rotation orientation) const;
     MAV_DISTANCE_SENSOR get_mav_distance_sensor_type_orient(enum Rotation orientation) const;
-    RangeFinder_Status status_orient(enum Rotation orientation) const;
+    RangeFinder::Status status_orient(enum Rotation orientation) const;
     bool has_data_orient(enum Rotation orientation) const;
     uint8_t range_valid_count_orient(enum Rotation orientation) const;
     const Vector3f &get_pos_offset_orient(enum Rotation orientation) const;
