@@ -20,10 +20,19 @@ void AP_Mount_Backend::set_roi_target(const struct Location &target_loc)
 {
     // set the target gps location
     _state._roi_target = target_loc;
-    _state._roi_target_set_ms = AP_HAL::millis();
+    _state._roi_target_set = true;
 
     // set the mode to GPS tracking mode
     _frontend.set_mode(_instance, MAV_MOUNT_MODE_GPS_POINT);
+}
+
+// set_sys_target - sets system that mount should attempt to point towards
+void AP_Mount_Backend::set_target_sysid(uint8_t sysid)
+{
+    _state._target_sysid = sysid;
+
+    // set the mode to sysid tracking mode
+    _frontend.set_mode(_instance, MAV_MOUNT_MODE_SYSID_TARGET);
 }
 
 // process MOUNT_CONFIGURE messages received from GCS.  deprecated.
@@ -135,16 +144,34 @@ float AP_Mount_Backend::angle_input_rad(const RC_Channel* rc, int16_t angle_min,
 bool AP_Mount_Backend::calc_angle_to_roi_target(Vector3f& angles_to_target_rad,
                                                 bool calc_tilt,
                                                 bool calc_pan,
-                                                bool relative_pan)
+                                                bool relative_pan) const
 {
-    if (_state._roi_target_set_ms == 0) {
+    if (!_state._roi_target_set) {
         return false;
     }
     return calc_angle_to_location(_state._roi_target, angles_to_target_rad, calc_tilt, calc_pan, relative_pan);
 }
 
+bool AP_Mount_Backend::calc_angle_to_sysid_target(Vector3f& angles_to_target_rad,
+                                                  bool calc_tilt,
+                                                  bool calc_pan,
+                                                  bool relative_pan) const
+{
+    if (!_state._target_sysid_location_set) {
+        return false;
+    }
+    if (!_state._target_sysid) {
+        return false;
+    }
+    return calc_angle_to_location(_state._target_sysid_location,
+                                  angles_to_target_rad,
+                                  calc_tilt,
+                                  calc_pan,
+                                  relative_pan);
+}
+
 // calc_angle_to_location - calculates the earth-frame roll, tilt and pan angles (and radians) to point at the given target
-bool AP_Mount_Backend::calc_angle_to_location(const struct Location &target, Vector3f& angles_to_target_rad, bool calc_tilt, bool calc_pan, bool relative_pan)
+bool AP_Mount_Backend::calc_angle_to_location(const struct Location &target, Vector3f& angles_to_target_rad, bool calc_tilt, bool calc_pan, bool relative_pan) const
 {
     Location current_loc;
     if (!AP::ahrs().get_position(current_loc)) {
