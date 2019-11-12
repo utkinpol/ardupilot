@@ -63,53 +63,52 @@ void RC_Channel_Copter::init_aux_function(const aux_func_t ch_option, const aux_
 {
     // init channel options
     switch(ch_option) {
-    case AUX_FUNC::SIMPLE_MODE:
-    case AUX_FUNC::RANGEFINDER:
-    case AUX_FUNC::SUPERSIMPLE_MODE:
-    case AUX_FUNC::ACRO_TRAINER:
-    case AUX_FUNC::PARACHUTE_ENABLE:
-    case AUX_FUNC::PARACHUTE_3POS:      // we trust the vehicle will be disarmed so even if switch is in release position the chute will not release
-    case AUX_FUNC::RETRACT_MOUNT:
-    case AUX_FUNC::ATTCON_FEEDFWD:
-    case AUX_FUNC::ATTCON_ACCEL_LIM:
-    case AUX_FUNC::MOTOR_INTERLOCK:
-    case AUX_FUNC::AVOID_ADSB:
-    case AUX_FUNC::PRECISION_LOITER:
-    case AUX_FUNC::INVERTED:
-    case AUX_FUNC::WINCH_ENABLE:
-    case AUX_FUNC::STANDBY:
-    case AUX_FUNC::SURFACE_TRACKING:
-        do_aux_function(ch_option, ch_flag);
-        break;
     // the following functions do not need to be initialised:
+    case AUX_FUNC::ALTHOLD:
+    case AUX_FUNC::ARMDISARM:
+    case AUX_FUNC::AUTO:
+    case AUX_FUNC::AUTOTUNE:
+    case AUX_FUNC::BRAKE:
+    case AUX_FUNC::CIRCLE:
+    case AUX_FUNC::DRIFT:
     case AUX_FUNC::FLIP:
+    case AUX_FUNC::FLOWHOLD:
+    case AUX_FUNC::FOLLOW:
+    case AUX_FUNC::GUIDED:
+    case AUX_FUNC::LAND:
+    case AUX_FUNC::LOITER:
+    case AUX_FUNC::PARACHUTE_RELEASE:
+    case AUX_FUNC::POSHOLD:
+    case AUX_FUNC::RESETTOARMEDYAW:
     case AUX_FUNC::RTL:
     case AUX_FUNC::SAVE_TRIM:
     case AUX_FUNC::SAVE_WP:
-    case AUX_FUNC::RESETTOARMEDYAW:
-    case AUX_FUNC::AUTO:
-    case AUX_FUNC::AUTOTUNE:
-    case AUX_FUNC::LAND:
-    case AUX_FUNC::BRAKE:
-    case AUX_FUNC::THROW:
     case AUX_FUNC::SMART_RTL:
-    case AUX_FUNC::GUIDED:
-    case AUX_FUNC::LOITER:
-    case AUX_FUNC::FOLLOW:
-    case AUX_FUNC::PARACHUTE_RELEASE:
-    case AUX_FUNC::ARMDISARM:
-    case AUX_FUNC::WINCH_CONTROL:
+    case AUX_FUNC::STABILIZE:
+    case AUX_FUNC::THROW:
     case AUX_FUNC::USER_FUNC1:
     case AUX_FUNC::USER_FUNC2:
     case AUX_FUNC::USER_FUNC3:
+    case AUX_FUNC::WINCH_CONTROL:
     case AUX_FUNC::ZIGZAG:
     case AUX_FUNC::ZIGZAG_SaveWP:
-    case AUX_FUNC::STABILIZE:
-    case AUX_FUNC::POSHOLD:
-    case AUX_FUNC::ALTHOLD:
-    case AUX_FUNC::FLOWHOLD:
-    case AUX_FUNC::CIRCLE:
-    case AUX_FUNC::DRIFT:
+        break;
+    case AUX_FUNC::ACRO_TRAINER:
+    case AUX_FUNC::ATTCON_ACCEL_LIM:
+    case AUX_FUNC::ATTCON_FEEDFWD:
+    case AUX_FUNC::INVERTED:
+    case AUX_FUNC::MOTOR_INTERLOCK:
+    case AUX_FUNC::PARACHUTE_3POS:      // we trust the vehicle will be disarmed so even if switch is in release position the chute will not release
+    case AUX_FUNC::PARACHUTE_ENABLE:
+    case AUX_FUNC::PRECISION_LOITER:
+    case AUX_FUNC::RANGEFINDER:
+    case AUX_FUNC::RETRACT_MOUNT:
+    case AUX_FUNC::SIMPLE_MODE:
+    case AUX_FUNC::STANDBY:
+    case AUX_FUNC::SUPERSIMPLE_MODE:
+    case AUX_FUNC::SURFACE_TRACKING:
+    case AUX_FUNC::WINCH_ENABLE:
+        do_aux_function(ch_option, ch_flag);
         break;
     default:
         RC_Channel::init_aux_function(ch_option, ch_flag);
@@ -363,19 +362,6 @@ void RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const aux_sw
         case AUX_FUNC::THROW:
 #if MODE_THROW_ENABLED == ENABLED
             do_aux_function_change_mode(Mode::Number::THROW, ch_flag);
-#endif
-            break;
-
-        case AUX_FUNC::AVOID_ADSB:
-#if ADSB_ENABLED == ENABLED
-            // enable or disable AP_Avoidance
-            if (ch_flag == HIGH) {
-                copter.avoidance_adsb.enable();
-                AP::logger().Write_Event(LogEvent::AVOIDANCE_ADSB_ENABLE);
-            } else {
-                copter.avoidance_adsb.disable();
-                AP::logger().Write_Event(LogEvent::AVOIDANCE_ADSB_DISABLE);
-            }
 #endif
             break;
 
