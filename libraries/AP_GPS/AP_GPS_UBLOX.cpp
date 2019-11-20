@@ -23,6 +23,7 @@
 #include <AP_HAL/Util.h>
 #include <AP_Logger/AP_Logger.h>
 #include <GCS_MAVLink/GCS.h>
+#include <stdio.h>
 
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO || \
     CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BH
@@ -884,23 +885,50 @@ AP_GPS_UBLOX::_parse_gps(void)
                 cfg_len -= 4;
                 cfg_data += 4;
                 switch (id) {
-                case ConfigKey::TMODE_MODE: {
-                    uint8_t mode = cfg_data[0];
-                    cfg_len -= 1;
-                    cfg_data += 1;
-                    if (mode != 0) {
-                        // ask for mode 0, to disable TIME mode
-                        mode = 0;
-                        _configure_valset(ConfigKey::TMODE_MODE, 1, &mode);
-                        _unconfigured_messages |= CONFIG_TMODE_MODE;
-                    } else {
-                        _unconfigured_messages &= ~CONFIG_TMODE_MODE;
+                    case ConfigKey::TMODE_MODE: {
+                        uint8_t mode = cfg_data[0];
+                        if (mode != 0) {
+                            // ask for mode 0, to disable TIME mode
+                            mode = 0;
+                            _configure_valset(ConfigKey::TMODE_MODE, 1, &mode);
+                            _unconfigured_messages |= CONFIG_TMODE_MODE;
+                        } else {
+                            _unconfigured_messages &= ~CONFIG_TMODE_MODE;
+                        }
+                        break;
                     }
-                    break;
+                    default:
+                        break;
                 }
-                default:
-                    // we don't know the length so we stop parsing
-                    return false;
+
+                // step over the value
+                const uint8_t key_size = ((uint32_t)id >> 28) & 0x07; // mask off the storage size
+                uint8_t step_size = 0;
+                switch (key_size) {
+                    case 0x1: // bit
+                        step_size = 1;
+                        break;
+                    case 0x2: // byte
+                        step_size = 1;
+                        break;
+                    case 0x3: // 2 bytes
+                        step_size = 2;
+                        break;
+                    case 0x4: // 4 bytes
+                        step_size = 4;
+                        break;
+                    case 0x5: // 8 bytes
+                        step_size = 8;
+                        break;
+                    default:
+                        // unknown/bad key size
+                        return false;
+                }
+                if (cfg_len <= step_size) {
+                    cfg_len = 0;
+                } else {
+                    cfg_len -= step_size;
+                    cfg_data += step_size;
                 }
             }
         }
@@ -931,6 +959,10 @@ AP_GPS_UBLOX::_parse_gps(void)
             // check for F9. The F9 does not respond to SVINFO, so we need to use MON_VER
             // for hardware generation
             if (strncmp(_version.hwVersion, "00190000", 8) == 0) {
+                if (_hardware_generation != UBLOX_F9) {
+                    // need to ensure time mode is correctly setup on F9
+                    _unconfigured_messages |= CONFIG_TMODE_MODE;
+                }
                 _hardware_generation = UBLOX_F9;
             }
             break;
@@ -1517,7 +1549,8 @@ static const char *reasons[] = {"navigation rate",
                                 "SBAS settings",
                                 "PVT rate",
                                 "time pulse settings",
-                                "TIMEGPS rate"};
+                                "TIMEGPS rate",
+                                "Time mode settings"};
 
 static_assert((1 << ARRAY_SIZE(reasons)) == CONFIG_LAST, "UBLOX: Missing configuration description");
 

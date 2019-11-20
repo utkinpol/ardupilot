@@ -40,12 +40,13 @@ public:
     // Proximity driver types
     enum class Type {
         None    = 0,
-        SF40C   = 1,
+        SF40C_v09 = 1,
         MAV     = 2,
         TRTOWER = 3,
         RangeFinder = 4,
         RPLidarA2 = 5,
         TRTOWEREVO = 6,
+        SF40C = 7,
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         SITL    = 10,
         MorseSITL = 11,
