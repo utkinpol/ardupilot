@@ -104,7 +104,7 @@ void Plane::calc_airspeed_errors()
     
     // we use the airspeed estimate function not direct sensor as TECS
     // may be using synthetic airspeed
-    ahrs.airspeed_estimate(&airspeed_measured);
+    ahrs.airspeed_estimate(airspeed_measured);
 
     // FBW_B/cruise airspeed target
     if (!failsafe.rc_failsafe && (control_mode == &mode_fbwb || control_mode == &mode_cruise)) {
@@ -318,6 +318,13 @@ void Plane::update_fbwb_speed_height(void)
             // the current altitude
             set_target_altitude_current();
         }
+
+#if SOARING_ENABLED == ENABLED
+        if (g2.soaring_controller.is_active() && g2.soaring_controller.get_throttle_suppressed()) {
+            // we're in soaring mode with throttle suppressed
+            set_target_altitude_current();;
+        }
+#endif
         
         target_altitude.last_elevator_input = elevator_input;
     }

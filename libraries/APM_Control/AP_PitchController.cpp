@@ -239,7 +239,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 int32_t AP_PitchController::get_rate_out(float desired_rate, float scaler)
 {
     float aspeed;
-	if (!_ahrs.airspeed_estimate(&aspeed)) {
+	if (!_ahrs.airspeed_estimate(aspeed)) {
 	    // If no airspeed available use average of min and max
         aspeed = 0.5f*(float(aparm.airspeed_min) + float(aparm.airspeed_max));
 	}
@@ -270,7 +270,7 @@ float AP_PitchController::_get_coordination_rate_offset(float &aspeed, bool &inv
 			bank_angle = constrain_float(bank_angle,-radians(180),-radians(100));
 		}
 	}
-	if (!_ahrs.airspeed_estimate(&aspeed)) {
+	if (!_ahrs.airspeed_estimate(aspeed)) {
 	    // If no airspeed available use average of min and max
         aspeed = 0.5f*(float(aparm.airspeed_min) + float(aparm.airspeed_max));
 	}
@@ -278,7 +278,7 @@ float AP_PitchController::_get_coordination_rate_offset(float &aspeed, bool &inv
         // don't do turn coordination handling when at very high pitch angles
         rate_offset = 0;
     } else {
-        rate_offset = cosf(_ahrs.pitch)*fabsf(ToDeg((GRAVITY_MSS / MAX((aspeed * _ahrs.get_EAS2TAS()) , float(aparm.airspeed_min))) * tanf(bank_angle) * sinf(bank_angle))) * _roll_ff;
+        rate_offset = cosf(_ahrs.pitch)*fabsf(ToDeg((GRAVITY_MSS / MAX((aspeed * _ahrs.get_EAS2TAS()) , MAX(aparm.airspeed_min, 1))) * tanf(bank_angle) * sinf(bank_angle))) * _roll_ff;
     }
 	if (inverted) {
 		rate_offset = -rate_offset;

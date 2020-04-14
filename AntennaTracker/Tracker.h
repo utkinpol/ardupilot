@@ -1,7 +1,7 @@
 /*
    Lead developers: Matthew Ridley and Andrew Tridgell
 
-   Please contribute your ideas! See http://dev.ardupilot.org for details
+   Please contribute your ideas! See https://dev.ardupilot.org for details
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,34 +29,19 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Param/AP_Param.h>
-#include <StorageManager/StorageManager.h>
-#include <AP_GPS/AP_GPS.h>         // ArduPilot GPS library
-#include <AP_Baro/AP_Baro.h>        // ArduPilot barometer library
-#include <AP_Compass/AP_Compass.h>     // ArduPilot Mega Magnetometer Library
 #include <AP_Math/AP_Math.h>        // ArduPilot Mega Vector/Matrix math Library
-#include <AP_InertialSensor/AP_InertialSensor.h> // Inertial Sensor Library
-#include <AP_AccelCal/AP_AccelCal.h>                // interface and maths for accelerometer calibration
 #include <AP_AHRS/AP_AHRS.h>         // ArduPilot Mega DCM Library
 #include <Filter/Filter.h>                     // Filter library
 
-#include <AP_SerialManager/AP_SerialManager.h>   // Serial manager library
-#include <AP_Declination/AP_Declination.h> // ArduPilot Mega Declination Helper Library
 #include <AP_Logger/AP_Logger.h>
-#include <AC_PID/AC_PID.h>
 #include <AP_Scheduler/AP_Scheduler.h>       // main loop scheduler
 #include <AP_NavEKF2/AP_NavEKF2.h>
 #include <AP_NavEKF3/AP_NavEKF3.h>
 
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_Mission/AP_Mission.h>
-#include <AP_Terrain/AP_Terrain.h>
-#include <AP_Rally/AP_Rally.h>
 #include <AP_Stats/AP_Stats.h>                      // statistics library
 #include <AP_BattMonitor/AP_BattMonitor.h> // Battery monitor library
-#include <AP_Airspeed/AP_Airspeed.h>
-#include <AP_OpticalFlow/AP_OpticalFlow.h>
-#include <AP_Beacon/AP_Beacon.h>
-#include <AP_Common/AP_FWVersion.h>
 
 // Configuration
 #include "config.h"
@@ -66,6 +51,8 @@
 #include "Parameters.h"
 #include "GCS_Mavlink.h"
 #include "GCS_Tracker.h"
+
+#include "AP_Arming.h"
 
 #ifdef ENABLE_SCRIPTING
 #include <AP_Scripting/AP_Scripting.h>
@@ -88,30 +75,12 @@ public:
 
     Tracker(void);
 
-    static const AP_FWVersion fwver;
-
-    // HAL::Callbacks implementation.
-    void setup() override;
-    void loop() override;
-
 private:
     Parameters g;
-
-    // main loop scheduler
-    AP_Scheduler scheduler;
 
     uint32_t start_time_ms = 0;
 
     AP_Logger logger;
-
-// Inertial Navigation EKF
-#if AP_AHRS_NAVEKF_AVAILABLE
-    NavEKF2 EKF2{&ahrs, rangefinder};
-    NavEKF3 EKF3{&ahrs, rangefinder};
-    AP_AHRS_NavEKF ahrs{EKF2, EKF3};
-#else
-    AP_AHRS_DCM ahrs;
-#endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     SITL::SITL sitl;
@@ -194,10 +163,10 @@ private:
     static const AP_Param::Info var_info[];
     static const struct LogStructure log_structure[];
 
-    // true if the compass's initial location has been set
-    bool compass_init_location;
-
-    // AntennaTracker.cpp
+    // Tracker.cpp
+    void get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
+                             uint8_t &task_count,
+                             uint32_t &log_bit) override;
     void one_second_loop();
     void ten_hz_logging_loop();
     void stats_update();
@@ -213,7 +182,7 @@ private:
     void log_init(void);
 
     // Parameters.cpp
-    void load_parameters(void);
+    void load_parameters(void) override;
 
     // radio.cpp
     void read_radio();
@@ -238,7 +207,7 @@ private:
     void update_yaw_cr_servo(float yaw);
 
     // system.cpp
-    void init_tracker();
+    void init_ardupilot() override;
     bool get_home_eeprom(struct Location &loc);
     bool set_home_eeprom(const Location &temp) WARN_IF_UNUSED;
     bool set_home(const Location &temp) WARN_IF_UNUSED;
@@ -247,6 +216,7 @@ private:
     void prepare_servos();
     void set_mode(Mode &newmode, ModeReason reason);
     bool set_mode(uint8_t new_mode, ModeReason reason) override;
+    uint8_t get_mode() const override { return (uint8_t)mode->number(); }
     bool should_log(uint32_t mask);
     bool start_command_callback(const AP_Mission::Mission_Command& cmd) { return false; }
     void exit_mission_callback() { return; }
@@ -262,13 +232,14 @@ private:
     void tracking_manual_control(const mavlink_manual_control_t &msg);
     void update_armed_disarmed();
 
+    // Arming/Disarming management class
+    AP_Arming_Tracker arming;
+
     // Mission library
     AP_Mission mission{
             FUNCTOR_BIND_MEMBER(&Tracker::start_command_callback, bool, const AP_Mission::Mission_Command &),
             FUNCTOR_BIND_MEMBER(&Tracker::verify_command_callback, bool, const AP_Mission::Mission_Command &),
             FUNCTOR_BIND_MEMBER(&Tracker::exit_mission_callback, void)};
-public:
-    void mavlink_delay_cb();
 };
 
 extern Tracker tracker;

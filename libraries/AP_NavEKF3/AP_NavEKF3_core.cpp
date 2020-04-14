@@ -177,7 +177,7 @@ void NavEKF3_core::InitialiseVariables()
     lastPosPassTime_ms = 0;
     lastHgtPassTime_ms = 0;
     lastTasPassTime_ms = 0;
-    lastSynthYawTime_ms = imuSampleTime_ms;
+    lastSynthYawTime_ms = 0;
     lastTimeGpsReceived_ms = 0;
     secondLastGpsTime_ms = 0;
     lastDecayTime_ms = imuSampleTime_ms;
@@ -406,9 +406,7 @@ void NavEKF3_core::InitialiseVariablesMag()
     mag_state.DCM.identity();
     inhibitMagStates = true;
     magStoreIndex = 0;
-    if (_ahrs->get_compass()) {
-        magSelectIndex = _ahrs->get_compass()->get_primary();
-    }
+    magSelectIndex = 0;
     lastMagOffsetsValid = false;
     magStateResetRequest = false;
     magStateInitComplete = false;

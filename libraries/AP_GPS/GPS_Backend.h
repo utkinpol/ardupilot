@@ -57,6 +57,8 @@ public:
 
     // driver specific health, returns true if the driver is healthy
     virtual bool is_healthy(void) const { return true; }
+    // returns true if the GPS is doing any logging it is expected to
+    virtual bool logging_healthy(void) const { return true; }
 
     virtual const char *name() const = 0;
 
@@ -64,6 +66,10 @@ public:
     virtual void Write_AP_Logger_Log_Startup_messages() const;
 
     virtual bool prepare_for_arming(void) { return true; }
+
+    // optional support for retrieving RTCMv3 data from a moving baseline base
+    virtual bool get_RTCMV3(const uint8_t *&bytes, uint16_t &len) { return false; }
+    virtual void clear_RTCMV3(void) {};
 
 protected:
     AP_HAL::UARTDriver *port;           ///< UART we are attached to

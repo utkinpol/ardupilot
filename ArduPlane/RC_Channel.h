@@ -25,13 +25,15 @@ public:
 
     RC_Channel_Plane obj_channels[NUM_RC_CHANNELS];
     RC_Channel_Plane *channel(const uint8_t chan) override {
-        if (chan > NUM_RC_CHANNELS) {
+        if (chan >= NUM_RC_CHANNELS) {
             return nullptr;
         }
         return &obj_channels[chan];
     }
 
     bool has_valid_input() const override;
+
+    RC_Channel *get_arming_channel(void) const override;
 
 protected:
 

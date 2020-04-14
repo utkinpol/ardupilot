@@ -8,12 +8,6 @@
 *
 *****************************************************************************/
 
-static void mavlink_delay_cb_static()
-{
-    copter.mavlink_delay_cb();
-}
-
-
 static void failsafe_check_static()
 {
     copter.failsafe_check();
@@ -21,44 +15,12 @@ static void failsafe_check_static()
 
 void Copter::init_ardupilot()
 {
-    // initialise serial port
-    serial_manager.init_console();
-
-    hal.console->printf("\n\nInit %s"
-                        "\n\nFree RAM: %u\n",
-                        AP::fwversion().fw_string,
-                        (unsigned)hal.util->available_memory());
-
-    //
-    // Report firmware version code expect on console (check of actual EEPROM format version is done in load_parameters function)
-    //
-    report_version();
-
-    // load parameters from EEPROM
-    load_parameters();
-
-    // time per loop - this gets updated in the main loop() based on
-    // actual loop rate
-    G_Dt = 1.0 / scheduler.get_loop_rate_hz();
 
 #if STATS_ENABLED == ENABLED
     // initialise stats module
     g2.stats.init();
 #endif
 
-    // identify ourselves correctly with the ground station
-    mavlink_system.sysid = g.sysid_this_mav;
-    
-    // initialise serial ports
-    serial_manager.init();
-
-    // setup first port early to allow BoardConfig to report errors
-    gcs().setup_console();
-
-    // Register mavlink_delay_cb, which will run anytime you have
-    // more than 5ms remaining in your call to hal.scheduler->delay
-    hal.scheduler->register_delay_callback(mavlink_delay_cb_static, 5);
-    
     BoardConfig.init();
 #if HAL_WITH_UAVCAN
     BoardConfig_CAN.init();
@@ -160,6 +122,7 @@ void Copter::init_ardupilot()
     attitude_control->parameter_sanity_check();
     pos_control->set_dt(scheduler.get_loop_period_s());
 
+
     // init the optical flow sensor
     init_optflow();
 
@@ -208,9 +171,6 @@ void Copter::init_ardupilot()
     g2.beacon.init();
 #endif
 
-    // init visual odometry
-    init_visual_odom();
-
 #if RPM_ENABLED == ENABLED
     // initialise AP_RPM library
     rpm_sensor.init();
@@ -232,9 +192,7 @@ void Copter::init_ardupilot()
     startup_INS_ground();
 
 #ifdef ENABLE_SCRIPTING
-    if (!g2.scripting.init()) {
-        gcs().send_text(MAV_SEVERITY_ERROR, "Scripting failed to start");
-    }
+    g2.scripting.init();
 #endif // ENABLE_SCRIPTING
 
     // set landed flags
@@ -263,10 +221,6 @@ void Copter::init_ardupilot()
 
     // flag that initialisation has completed
     ap.initialised = true;
-
-#if AP_PARAM_KEY_DUMP
-    AP_Param::show_all(hal.console, true);
-#endif
 }
 
 
@@ -308,9 +262,10 @@ void Copter::update_dynamic_notch()
 
 #if RPM_ENABLED == ENABLED
         case HarmonicNotchDynamicMode::UpdateRPM: // rpm sensor based tracking
-            if (rpm_sensor.healthy(0)) {
+            float rpm;
+            if (rpm_sensor.get_rpm(0, rpm)) {
                 // set the harmonic notch filter frequency from the main rotor rpm
-                ins.update_harmonic_notch_freq_hz(MAX(ref_freq, rpm_sensor.get_rpm(0) * ref / 60.0f));
+                ins.update_harmonic_notch_freq_hz(MAX(ref_freq, rpm * ref / 60.0f));
             } else {
                 ins.update_harmonic_notch_freq_hz(ref_freq);
             }
@@ -319,6 +274,12 @@ void Copter::update_dynamic_notch()
 #ifdef HAVE_AP_BLHELI_SUPPORT
         case HarmonicNotchDynamicMode::UpdateBLHeli: // BLHeli based tracking
             ins.update_harmonic_notch_freq_hz(MAX(ref_freq, AP_BLHeli::get_singleton()->get_average_motor_frequency_hz() * ref));
+            break;
+#endif
+#if HAL_GYROFFT_ENABLED
+        case HarmonicNotchDynamicMode::UpdateGyroFFT: // FFT based tracking
+            // set the harmonic notch filter frequency scaled on measured frequency
+            ins.update_harmonic_notch_freq_hz(gyro_fft.get_weighted_noise_center_freq_hz());
             break;
 #endif
         case HarmonicNotchDynamicMode::Fixed: // static
@@ -363,9 +324,6 @@ bool Copter::ekf_position_ok() const
 // optflow_position_ok - returns true if optical flow based position estimate is ok
 bool Copter::optflow_position_ok() const
 {
-#if OPTFLOW != ENABLED && VISUAL_ODOMETRY_ENABLED != ENABLED
-    return false;
-#else
     // return immediately if EKF not used
     if (!ahrs.have_inertial_nav()) {
         return false;
@@ -378,8 +336,8 @@ bool Copter::optflow_position_ok() const
         enabled = true;
     }
 #endif
-#if VISUAL_ODOMETRY_ENABLED == ENABLED
-    if (g2.visual_odom.enabled()) {
+#if HAL_VISUALODOM_ENABLED
+    if (visual_odom.enabled()) {
         enabled = true;
     }
 #endif
@@ -396,7 +354,6 @@ bool Copter::optflow_position_ok() const
     } else {
         return (filt_status.flags.horiz_pos_rel && !filt_status.flags.const_pos_mode);
     }
-#endif
 }
 
 // update_auto_armed - update status of auto_armed flag
@@ -649,31 +606,6 @@ void Copter::allocate_motors(void)
         g.rc_speed.set_default(16000);
     }
     
-    if (upgrading_frame_params) {
-        // do frame specific upgrade. This is only done the first time we run the new firmware
-#if FRAME_CONFIG == HELI_FRAME
-        SRV_Channels::upgrade_motors_servo(Parameters::k_param_motors, 12, CH_1);
-        SRV_Channels::upgrade_motors_servo(Parameters::k_param_motors, 13, CH_2);
-        SRV_Channels::upgrade_motors_servo(Parameters::k_param_motors, 14, CH_3);
-        SRV_Channels::upgrade_motors_servo(Parameters::k_param_motors, 15, CH_4);
-#else
-        if (g2.frame_class == AP_Motors::MOTOR_FRAME_TRI) {
-            const AP_Param::ConversionInfo tri_conversion_info[] = {
-                { Parameters::k_param_motors, 32, AP_PARAM_INT16, "SERVO7_TRIM" },
-                { Parameters::k_param_motors, 33, AP_PARAM_INT16, "SERVO7_MIN" },
-                { Parameters::k_param_motors, 34, AP_PARAM_INT16, "SERVO7_MAX" },
-                { Parameters::k_param_motors, 35, AP_PARAM_FLOAT, "MOT_YAW_SV_ANGLE" },
-            };
-            // we need to use CONVERT_FLAG_FORCE as the SERVO7_* parameters will already be set from RC7_*
-            AP_Param::convert_old_parameters(tri_conversion_info, ARRAY_SIZE(tri_conversion_info), AP_Param::CONVERT_FLAG_FORCE);
-            const AP_Param::ConversionInfo tri_conversion_info_rev { Parameters::k_param_motors, 31, AP_PARAM_INT8,  "SERVO7_REVERSED" };
-            AP_Param::convert_old_parameter(&tri_conversion_info_rev, 1, AP_Param::CONVERT_FLAG_REVERSE | AP_Param::CONVERT_FLAG_FORCE);
-            // AP_MotorsTri was converted from having nested var_info to one level
-            AP_Param::convert_parent_class(Parameters::k_param_motors, motors, motors->var_info);
-        }
-#endif
-    }
-
     // upgrade parameters. This must be done after allocating the objects
     convert_pid_parameters();
 #if FRAME_CONFIG == HELI_FRAME

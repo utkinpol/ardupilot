@@ -93,9 +93,7 @@ AP_Compass_RM3100::AP_Compass_RM3100(AP_HAL::OwnPtr<AP_HAL::Device> _dev,
 
 bool AP_Compass_RM3100::init()
 {
-    if (!dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        return false;
-    }
+    dev->get_semaphore()->take_blocking();
 
     if (dev->bus_type() == AP_HAL::Device::BUS_TYPE_SPI) {
         // read has high bit set for SPI
@@ -122,13 +120,14 @@ bool AP_Compass_RM3100::init()
         ccy1 != CCP1_DEFAULT || ccy0 != CCP0_DEFAULT ||
         ccz1 != CCP1_DEFAULT || ccz0 != CCP0_DEFAULT) {
         // couldn't read one of the cycle count registers or didn't recognize the default cycle count values
-        goto fail;
+        dev->get_semaphore()->give();
+        return false;
     }
 
     dev->setup_checked_registers(8);
 
-    dev->write_register(RM3100_TMRC_REG, TMRC, true); // cycle count z
-    dev->write_register(RM3100_CMM_REG, CMM, false); // CMM configuration
+    dev->write_register(RM3100_TMRC_REG, TMRC, true); // CMM data rate
+    dev->write_register(RM3100_CMM_REG, CMM, true); // CMM configuration
     dev->write_register(RM3100_CCX1_REG, CCP1, true); // cycle count x
     dev->write_register(RM3100_CCX0_REG, CCP0, true); // cycle count x
     dev->write_register(RM3100_CCY1_REG, CCP1, true); // cycle count y
@@ -136,17 +135,21 @@ bool AP_Compass_RM3100::init()
     dev->write_register(RM3100_CCZ1_REG, CCP1, true); // cycle count z
     dev->write_register(RM3100_CCZ0_REG, CCP0, true); // cycle count z
 
-    _scaler = (1 / GAIN_CC200) * UTESLA_TO_MGAUSS; // has to be changed if using a different cycle count
+    _scaler = (1 / GAIN_CC200) * UTESLA_TO_MGAUSS / 200.0; // has to be changed if using a different cycle count
 
     // lower retries for run
     dev->set_retries(3);
-    
+
     dev->get_semaphore()->give();
 
     /* register the compass instance in the frontend */
-    compass_instance = register_compass();
+    dev->set_device_type(DEVTYPE_RM3100);
+    if (!register_compass(dev->get_bus_id(), compass_instance)) {
+        return false;
+    }
+    set_dev_id(compass_instance, dev->get_bus_id());
 
-    printf("Found a RM3100 at address 0x%x as compass %u\n", dev->get_bus_address(), compass_instance);
+    hal.console->printf("RM3100: Found at address 0x%x as compass %u\n", dev->get_bus_address(), compass_instance);
     
     set_rotation(compass_instance, rotation);
 
@@ -154,18 +157,11 @@ bool AP_Compass_RM3100::init()
         set_external(compass_instance, true);
     }
     
-    dev->set_device_type(DEVTYPE_RM3100);
-    set_dev_id(compass_instance, dev->get_bus_id());
-
     // call timer() at 80Hz
     dev->register_periodic_callback(1000000U/80U,
                                     FUNCTOR_BIND_MEMBER(&AP_Compass_RM3100::timer, void));
 
     return true;
-
-fail:
-    dev->get_semaphore()->give();
-    return false;
 }
 
 void AP_Compass_RM3100::timer()
@@ -207,11 +203,6 @@ void AP_Compass_RM3100::timer()
     magx = ((uint32_t)data.magx_2 << 24) | ((uint32_t)data.magx_1 << 16) | ((uint32_t)data.magx_0 << 8);
     magy = ((uint32_t)data.magy_2 << 24) | ((uint32_t)data.magy_1 << 16) | ((uint32_t)data.magy_0 << 8);
     magz = ((uint32_t)data.magz_2 << 24) | ((uint32_t)data.magz_1 << 16) | ((uint32_t)data.magz_0 << 8);
-
-    // right-shift signed integer back to get correct measurement value
-    magx >>= 8;
-    magy >>= 8;
-    magz >>= 8;
 
     // apply scaler and store in field vector
     field(magx * _scaler, magy * _scaler, magz * _scaler);

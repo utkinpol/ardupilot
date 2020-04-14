@@ -215,6 +215,7 @@ private:
         PROBE_KELLER=(1<<8),
         PROBE_MS5837=(1<<9),
         PROBE_BMP388=(1<<10),
+        PROBE_SPL06=(1<<11),
     };
     
     struct sensor {
@@ -254,7 +255,7 @@ private:
     AP_Int32                           _baro_probe_ext;
 
     // semaphore for API access from threads
-    HAL_Semaphore_Recursive            _rsem;
+    HAL_Semaphore                      _rsem;
 };
 
 namespace AP {

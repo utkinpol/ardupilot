@@ -54,7 +54,7 @@ public:
 #endif
     };
 
-    enum Status {
+    enum class Status {
         NotConnected = 0,
         NoData,
         Good
@@ -84,11 +84,6 @@ public:
     uint8_t num_sensors(void) const {
         return num_instances;
     }
-
-    // get distance in meters in a particular direction in degrees (0 is forward, clockwise)
-    // returns true on successful read and places distance in distance
-    bool get_horizontal_distance(uint8_t instance, float angle_deg, float &distance) const;
-    bool get_horizontal_distance(float angle_deg, float &distance) const;
 
     // get distances in PROXIMITY_MAX_DIRECTION directions. used for sending distances to ground station
     bool get_horizontal_distances(Proximity_Distance_Array &prx_dist_array) const;

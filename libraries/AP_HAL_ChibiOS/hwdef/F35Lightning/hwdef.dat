@@ -151,13 +151,16 @@ define HAL_PROBE_EXTERNAL_I2C_BAROS
 #define HAL_BOARD_TERRAIN_DIRECTORY "/APM/TERRAIN"
 
 # OSD support
-define OSD_ENABLED ENABLED
+define OSD_ENABLED 1
 define HAL_OSD_TYPE_DEFAULT 1
 ROMFS_WILDCARD libraries/AP_OSD/fonts/font*.bin
 
 # available storage
 define HAL_STORAGE_SIZE 15360
 define STORAGE_FLASH_PAGE 1
+
+#eliminate EKF2 to save flash size
+define HAL_NAVEKF2_AVAILABLE 0
 
 # defaults for battery monitoring
 define HAL_BATT_MONITOR_DEFAULT 4

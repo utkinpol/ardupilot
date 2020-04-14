@@ -189,21 +189,6 @@ void ModeAuto::takeoff_start(const Location& dest_loc)
 }
 
 // auto_wp_start - initialises waypoint controller to implement flying to a particular destination
-void ModeAuto::wp_start(const Vector3f& destination, bool terrain_alt)
-{
-    _mode = Auto_WP;
-
-    // initialise wpnav (no need to check return status because terrain data is not used)
-    wp_nav->set_wp_destination(destination, terrain_alt);
-
-    // initialise yaw
-    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
-    if (auto_yaw.mode() != AUTO_YAW_ROI) {
-        auto_yaw.set_mode_to_default(false);
-    }
-}
-
-// auto_wp_start - initialises waypoint controller to implement flying to a particular destination
 void ModeAuto::wp_start(const Location& dest_loc)
 {
     _mode = Auto_WP;
@@ -249,6 +234,9 @@ void ModeAuto::land_start(const Vector3f& destination)
 
     // initialise yaw
     auto_yaw.set_mode(AUTO_YAW_HOLD);
+
+    // optionally deploy landing gear
+    copter.landinggear.deploy_for_landing();
 }
 
 // auto_circle_movetoedge_start - initialise waypoint controller to move to edge of a circle with it's center at the specified location
@@ -371,19 +359,6 @@ bool ModeAuto::is_landing() const
 bool ModeAuto::is_taking_off() const
 {
     return ((_mode == Auto_TakeOff) && !wp_nav->reached_wp_destination());
-}
-
-bool ModeAuto::landing_gear_should_be_deployed() const
-{
-    switch(_mode) {
-    case Auto_Land:
-        return true;
-    case Auto_RTL:
-        return copter.mode_rtl.landing_gear_should_be_deployed();
-    default:
-        return false;
-    }
-    return false;
 }
 
 // auto_payload_place_start - initialises controller to implement a placing
@@ -543,7 +518,7 @@ void ModeAuto::exit_mission()
         }
     } else {
         // if we've landed it's safe to disarm
-        copter.arming.disarm();
+        copter.arming.disarm(AP_Arming::Method::MISSIONEXIT);
     }
 }
 
@@ -1166,14 +1141,14 @@ void ModeAuto::do_land(const AP_Mission::Mission_Command& cmd)
     // if location provided we fly to that location at current altitude
     if (cmd.content.location.lat != 0 || cmd.content.location.lng != 0) {
         // set state to fly to location
-        land_state = LandStateType_FlyToLocation;
+        state = State::FlyToLocation;
 
         const Location target_loc = terrain_adjusted_location(cmd);
 
         wp_start(target_loc);
     } else {
         // set landing state
-        land_state = LandStateType_Descending;
+        state = State::Descending;
 
         // initialise landing controller
         land_start();
@@ -1508,7 +1483,7 @@ bool ModeAuto::verify_takeoff()
 
     // retract the landing gear
     if (reached_wp_dest) {
-        copter.landinggear.set_position(AP_LandingGear::LandingGear_Retract);
+        copter.landinggear.retract_after_takeoff();
     }
 
     return reached_wp_dest;
@@ -1519,8 +1494,8 @@ bool ModeAuto::verify_land()
 {
     bool retval = false;
 
-    switch (land_state) {
-        case LandStateType_FlyToLocation:
+    switch (state) {
+        case State::FlyToLocation:
             // check if we've reached the location
             if (copter.wp_nav->reached_wp_destination()) {
                 // get destination so we can use it for loiter target
@@ -1530,11 +1505,11 @@ bool ModeAuto::verify_land()
                 land_start(dest);
 
                 // advance to next state
-                land_state = LandStateType_Descending;
+                state = State::Descending;
             }
             break;
 
-        case LandStateType_Descending:
+        case State::Descending:
             // rely on THROTTLE_LAND mode to correctly update landing status
             retval = copter.ap.land_complete && (motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE);
             break;
@@ -1755,8 +1730,8 @@ bool ModeAuto::verify_loiter_to_alt()
 bool ModeAuto::verify_RTL()
 {
     return (copter.mode_rtl.state_complete() && 
-    (copter.mode_rtl.state() == RTL_FinalDescent || copter.mode_rtl.state() == RTL_Land) &&
-    (motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE));
+            (copter.mode_rtl.state() == ModeRTL::RTL_FinalDescent || copter.mode_rtl.state() == ModeRTL::RTL_Land) &&
+            (motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE));
 }
 
 /********************************************************************************/

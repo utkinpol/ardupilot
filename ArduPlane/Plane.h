@@ -160,10 +160,6 @@ public:
 
     Plane(void);
 
-    // HAL::Callbacks implementation.
-    void setup() override;
-    void loop() override;
-
 private:
 
     // key aircraft parameters passed to multiple libraries
@@ -172,9 +168,6 @@ private:
     // Global parameters are all contained within the 'g' and 'g2' classes.
     Parameters g;
     ParametersG2 g2;
-
-    // main loop scheduler
-    AP_Scheduler scheduler;
 
     // mapping between input channels
     RCMapper rcmap;
@@ -197,15 +190,6 @@ private:
     AP_Vehicle::FixedWing::Rangefinder_State rangefinder_state;
 
     AP_RPM rpm_sensor;
-
-// Inertial Navigation EKF
-#if AP_AHRS_NAVEKF_AVAILABLE
-    NavEKF2 EKF2{&ahrs, rangefinder};
-    NavEKF3 EKF3{&ahrs, rangefinder};
-    AP_AHRS_NavEKF ahrs{EKF2, EKF3};
-#else
-    AP_AHRS_DCM ahrs;
-#endif
 
     AP_TECS TECS_controller{ahrs, aparm, landing};
     AP_L1_Control L1_controller{ahrs, &TECS_controller};
@@ -736,11 +720,6 @@ private:
 
     float relative_altitude;
 
-    // INS variables
-    // The main loop execution time.  Seconds
-    // This is the time between calls to the DCM algorithm and is the Integration time for the gyros.
-    float G_Dt = 0.02f;
-
     // loop performance monitoring:
     AP::PerfInfo perf_info;
     struct {
@@ -778,6 +757,9 @@ private:
     // rudder mixing gain for differential thrust (0 - 1)
     float rudder_dt;
 
+    // soaring mode-change timer
+    uint32_t soaring_mode_timer;
+
     void adjust_nav_pitch_throttle(void);
     void update_load_factor(void);
     void send_fence_status(mavlink_channel_t chan);
@@ -793,13 +775,12 @@ private:
     void Log_Write_Control_Tuning();
     void Log_Write_Nav_Tuning();
     void Log_Write_Status();
-    void Log_Write_Sonar();
     void Log_Write_RC(void);
     void Log_Write_Vehicle_Startup_Messages();
     void Log_Write_AOA_SSA();
     void Log_Write_AETR();
 
-    void load_parameters(void);
+    void load_parameters(void) override;
     void convert_mixers(void);
     void adjust_altitude_target();
     void setup_glide_slope(void);
@@ -890,7 +871,7 @@ private:
     void update_fbwb_speed_height(void);
     void setup_turn_angle(void);
     bool reached_loiter_target(void);
-    void set_control_channels(void);
+    void set_control_channels(void) override;
     void init_rc_in();
     void init_rc_out_main();
     void init_rc_out_aux();
@@ -905,11 +886,15 @@ private:
     void read_airspeed(void);
     void rpm_update(void);
     void efi_update(void);
-    void init_ardupilot();
+    void init_ardupilot() override;
+    void get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
+                             uint8_t &task_count,
+                             uint32_t &log_bit) override;
     void startup_ground(void);
     bool set_mode(Mode& new_mode, const ModeReason reason);
     bool set_mode(const uint8_t mode, const ModeReason reason) override;
     bool set_mode_by_number(const Mode::Number new_mode_number, const ModeReason reason);
+    uint8_t get_mode() const override { return (uint8_t)control_mode->mode_number(); }
     Mode *mode_from_mode_num(const enum Mode::Number num);
     void check_long_failsafe();
     void check_short_failsafe();
@@ -1056,8 +1041,9 @@ private:
                   "_failsafe_priorities is missing the sentinel");
 
 public:
-    void mavlink_delay_cb();
     void failsafe_check(void);
+    bool set_target_location(const Location& target_loc) override;
+    bool get_target_location(Location& target_loc) override;
 };
 
 extern Plane plane;

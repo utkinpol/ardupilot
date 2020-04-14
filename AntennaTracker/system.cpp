@@ -3,37 +3,10 @@
 // mission storage
 static const StorageAccess wp_storage(StorageManager::StorageMission);
 
-static void mavlink_delay_cb_static()
+void Tracker::init_ardupilot()
 {
-    tracker.mavlink_delay_cb();
-}
-
-void Tracker::init_tracker()
-{
-    // initialise console serial port
-    serial_manager.init_console();
-
-    hal.console->printf("\n\nInit %s\n\nFree RAM: %u\n",
-                        AP::fwversion().fw_string,
-                        (unsigned)hal.util->available_memory());
-
-    // Check the EEPROM format version before loading any parameters from EEPROM
-    load_parameters();
-
     // initialise stats module
     stats.init();
-
-    mavlink_system.sysid = g.sysid_this_mav;
-
-    // initialise serial ports
-    serial_manager.init();
-
-    // setup first port early to allow BoardConfig to report errors
-    gcs().setup_console();
-
-    // Register mavlink_delay_cb, which will run anytime you have
-    // more than 5ms remaining in your call to hal.scheduler->delay
-    hal.scheduler->register_delay_callback(mavlink_delay_cb_static, 5);
 
     BoardConfig.init();
 #if HAL_WITH_UAVCAN
@@ -60,9 +33,7 @@ void Tracker::init_tracker()
 #endif
 
 #ifdef ENABLE_SCRIPTING
-    if (!scripting.init()) {
-        gcs().send_text(MAV_SEVERITY_ERROR, "Scripting failed to start");
-    }
+    scripting.init();
 #endif // ENABLE_SCRIPTING
 
     // initialise compass
@@ -86,6 +57,9 @@ void Tracker::init_tracker()
 
     // set serial ports non-blocking
     serial_manager.set_blocking_writes_all(false);
+
+    // initialise rc channels including setting mode
+    rc().init();
 
     // initialise servos
     init_servos();
@@ -195,8 +169,8 @@ void Tracker::disarm_servos()
 void Tracker::prepare_servos()
 {
     start_time_ms = AP_HAL::millis();
-    SRV_Channels::set_output_limit(SRV_Channel::k_tracker_yaw, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
-    SRV_Channels::set_output_limit(SRV_Channel::k_tracker_pitch, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
+    SRV_Channels::set_output_limit(SRV_Channel::k_tracker_yaw, SRV_Channel::Limit::TRIM);
+    SRV_Channels::set_output_limit(SRV_Channel::k_tracker_pitch, SRV_Channel::Limit::TRIM);
     SRV_Channels::calc_pwm();
     SRV_Channels::output_ch_all();
 }
@@ -266,17 +240,9 @@ bool Tracker::should_log(uint32_t mask)
 }
 
 
-#include <AP_Camera/AP_Camera.h>
 #include <AP_AdvancedFailsafe/AP_AdvancedFailsafe.h>
 #include <AP_Avoidance/AP_Avoidance.h>
 #include <AP_ADSB/AP_ADSB.h>
-
-/* dummy methods to avoid having to link against AP_Camera */
-void AP_Camera::control_msg(const mavlink_message_t &) {}
-void AP_Camera::configure(float, float, float, float, float, float, float) {}
-void AP_Camera::control(float, float, float, float, float, float) {}
-void AP_Camera::send_feedback(mavlink_channel_t chan) {}
-/* end dummy methods to avoid having to link against AP_Camera */
 
 // dummy method to avoid linking AFS
 bool AP_AdvancedFailsafe::gcs_terminate(bool should_terminate, const char *reason) {return false;}

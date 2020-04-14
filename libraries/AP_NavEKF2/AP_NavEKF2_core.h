@@ -271,7 +271,7 @@ public:
     void  getFilterStatus(nav_filter_status &status) const;
 
     // send an EKF_STATUS_REPORT message to GCS
-    void send_status_report(mavlink_channel_t chan);
+    void send_status_report(mavlink_channel_t chan) const;
 
     // provides the height limit to be observed by the control loops
     // returns false if no height limiting is required
@@ -314,7 +314,6 @@ public:
     /*
      * Write position and quaternion data from an external navigation system
      *
-     * sensOffset : position of the external navigation sensor in body frame (m)
      * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
      * quat       : quaternion desribing the rotation from navigation frame to body frame
      * posErr     : 1-sigma spherical position error (m)
@@ -322,8 +321,10 @@ public:
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
      * resetTime_ms : system time of the last position reset request (mSec)
      *
+     * Sensor offsets are pulled directly from the AP_VisualOdom library
+     *
     */
-    void writeExtNavData(const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
+    void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms);
 
     // return true when external nav data is also being used as a yaw observation
     bool isExtNavUsedForYaw(void);
@@ -475,7 +476,6 @@ private:
         Quaternion      quat;       // quaternion describing the rotation from navigation to body frame
         float           posErr;     // spherical poition measurement error 1-std (m)
         float           angErr;     // spherical angular measurement error 1-std (rad)
-        const Vector3f *body_offset;// pointer to XYZ position of the sensor in body frame (m)
         uint32_t        time_ms;    // measurement timestamp (msec)
         bool            posReset;   // true when the position measurement has been reset
     };
@@ -775,7 +775,13 @@ private:
 
     // update timing statistics structure
     void updateTimingStatistics(void);
-    
+
+    // correct gps data for antenna position
+    void CorrectGPSForAntennaOffset(gps_elements &gps_data);
+
+    // correct external navigation earth-frame position using sensor body-frame offset
+    void CorrectExtNavForSensorOffset(Vector3f &ext_position);
+
     // Length of FIFO buffers used for non-IMU sensor data.
     // Must be larger than the time period defined by IMU_BUFFER_LENGTH
     static const uint32_t OBS_BUFFER_LENGTH = 5;

@@ -111,7 +111,6 @@ AP_Logger::AP_Logger(const AP_Int32 &log_bitmask)
 
 void AP_Logger::Init(const struct LogStructure *structures, uint8_t num_types)
 {
-    gcs().send_text(MAV_SEVERITY_INFO, "Preparing log system");
     if (hal.util->was_watchdog_armed()) {
         gcs().send_text(MAV_SEVERITY_INFO, "Forcing logging for watchdog reset");
         _params.log_disarmed.set(1);
@@ -138,14 +137,16 @@ void AP_Logger::Init(const struct LogStructure *structures, uint8_t num_types)
         }
         if (backends[_next_backend] == nullptr) {
             hal.console->printf("Unable to open AP_Logger_File");
+            // note that message_writer is leaked here; costs several
+            // hundred bytes to fix for marginal utility
         } else {
             _next_backend++;
         }
     }
 #endif // HAVE_FILESYSTEM_SUPPORT
 
-#if LOGGER_MAVLINK_SUPPORT
-    if (_params.backend_types & uint8_t(Backend_Type::MAVLINK)) {
+#ifdef HAL_LOGGING_DATAFLASH
+    if (_params.backend_types & uint8_t(Backend_Type::BLOCK)) {
         if (_next_backend == LOGGER_MAX_BACKENDS) {
             AP_HAL::panic("Too many backends");
             return;
@@ -153,11 +154,12 @@ void AP_Logger::Init(const struct LogStructure *structures, uint8_t num_types)
         LoggerMessageWriter_DFLogStart *message_writer =
             new LoggerMessageWriter_DFLogStart();
         if (message_writer != nullptr)  {
-            backends[_next_backend] = new AP_Logger_MAVLink(*this,
-                                                            message_writer);
+            backends[_next_backend] = new AP_Logger_DataFlash(*this, message_writer);
         }
         if (backends[_next_backend] == nullptr) {
-            hal.console->printf("Unable to open AP_Logger_MAVLink");
+            hal.console->printf("Unable to open AP_Logger_DataFlash");
+            // note that message_writer is leaked here; costs several
+            // hundred bytes to fix for marginal utility
         } else {
             _next_backend++;
         }
@@ -177,14 +179,16 @@ void AP_Logger::Init(const struct LogStructure *structures, uint8_t num_types)
         }
         if (backends[_next_backend] == nullptr) {
             hal.console->printf("Unable to open AP_Logger_SITL");
+            // note that message_writer is leaked here; costs several
+            // hundred bytes to fix for marginal utility
         } else {
             _next_backend++;
         }
     }
 #endif
-
-#ifdef HAL_LOGGING_DATAFLASH
-    if (_params.backend_types & uint8_t(Backend_Type::BLOCK)) {
+    // the "main" logging type needs to come before mavlink so that index 0 is correct
+#if LOGGER_MAVLINK_SUPPORT
+    if (_params.backend_types & uint8_t(Backend_Type::MAVLINK)) {
         if (_next_backend == LOGGER_MAX_BACKENDS) {
             AP_HAL::panic("Too many backends");
             return;
@@ -192,16 +196,19 @@ void AP_Logger::Init(const struct LogStructure *structures, uint8_t num_types)
         LoggerMessageWriter_DFLogStart *message_writer =
             new LoggerMessageWriter_DFLogStart();
         if (message_writer != nullptr)  {
-            backends[_next_backend] = new AP_Logger_DataFlash(*this, message_writer);
+            backends[_next_backend] = new AP_Logger_MAVLink(*this,
+                                                            message_writer);
         }
         if (backends[_next_backend] == nullptr) {
-            hal.console->printf("Unable to open AP_Logger_DataFlash");
+            hal.console->printf("Unable to open AP_Logger_MAVLink");
+            // note that message_writer is leaked here; costs several
+            // hundred bytes to fix for marginal utility
         } else {
             _next_backend++;
         }
     }
 #endif
-    
+
     for (uint8_t i=0; i<_next_backend; i++) {
         backends[i]->Init();
     }
@@ -209,8 +216,6 @@ void AP_Logger::Init(const struct LogStructure *structures, uint8_t num_types)
     Prep();
 
     EnableWrites(true);
-
-    gcs().send_text(MAV_SEVERITY_INFO, "Prepared log system");
 }
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -236,7 +241,7 @@ static uint8_t count_commas(const char *string)
 /// return a unit name given its ID
 const char* AP_Logger::unit_name(const uint8_t unit_id)
 {
-    for(uint8_t i=0; i<unit_id; i++) {
+    for (uint8_t i=0; i<unit_id; i++) {
         if (_units[i].ID == unit_id) {
             return _units[i].unit;
         }
@@ -247,7 +252,7 @@ const char* AP_Logger::unit_name(const uint8_t unit_id)
 /// return a multiplier value given its ID
 double AP_Logger::multiplier_name(const uint8_t multiplier_id)
 {
-    for(uint8_t i=0; i<multiplier_id; i++) {
+    for (uint8_t i=0; i<multiplier_id; i++) {
         if (_multipliers[i].ID == multiplier_id) {
             return _multipliers[i].multiplier;
         }
@@ -293,6 +298,44 @@ void AP_Logger::dump_structures(const struct LogStructure *logstructures, const 
 #endif
 }
 
+bool AP_Logger::labels_string_is_good(const char *labels) const
+{
+    // This goes through and slices labels up into substrings by
+    // changing commas to nulls - keeping references to each string in
+    // label_offsets.
+    bool passed = true;
+    char *label_offsets[LS_LABELS_SIZE];
+    uint8_t label_offsets_offset = 0;
+    char labels_copy[LS_LABELS_SIZE];
+    strncpy(labels_copy, labels, ARRAY_SIZE(labels_copy));
+    if (labels_copy[0] == ',') {
+        Debug("Leading comma in (%s)", labels);
+        passed = false;
+    }
+    label_offsets[label_offsets_offset++] = labels_copy;
+    const uint8_t len = strnlen(labels_copy, ARRAY_SIZE(labels_copy));
+    for (uint8_t i=0; i<len; i++) {
+        if (labels_copy[i] == ',') {
+            if (labels_copy[i+1] == '\0') {
+                Debug("Trailing comma in (%s)", labels);
+                passed = false;
+                continue;
+            }
+            labels_copy[i] = '\0';
+            label_offsets[label_offsets_offset++] = &labels_copy[i+1];
+        }
+    }
+    for (uint8_t i=0; i<label_offsets_offset-1; i++) {
+        for (uint8_t j=i+1; j<label_offsets_offset; j++) {
+            if (!strcmp(label_offsets[i], label_offsets[j])) {
+                Debug("Duplicate label (%s) in (%s)", label_offsets[i], labels);
+                passed = false;
+            }
+        }
+    }
+    return passed;
+}
+
 bool AP_Logger::validate_structure(const struct LogStructure *logstructure, const int16_t offset)
 {
     bool passed = true;
@@ -329,6 +372,10 @@ bool AP_Logger::validate_structure(const struct LogStructure *logstructure, cons
     if (fieldcount != labelcount) {
         Debug("  fieldcount=%u does not match labelcount=%u",
               fieldcount, labelcount);
+        passed = false;
+    }
+
+    if (!labels_string_is_good(logstructure->labels)) {
         passed = false;
     }
 
@@ -855,6 +902,8 @@ void AP_Logger::assert_same_fmt_for_name(const AP_Logger::log_write_fmt *f,
 
 AP_Logger::log_write_fmt *AP_Logger::msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt)
 {
+    WITH_SEMAPHORE(log_write_fmts_sem);
+
     struct log_write_fmt *f;
     for (f = log_write_fmts; f; f=f->next) {
         if (f->name == name) { // ptr comparison
@@ -998,7 +1047,7 @@ bool AP_Logger::fill_log_write_logstructure(struct LogStructure &logstruct, cons
     // find log structure information corresponding to msg_type:
     struct log_write_fmt *f;
     for (f = log_write_fmts; f; f=f->next) {
-        if(f->msg_type == msg_type) {
+        if (f->msg_type == msg_type) {
             break;
         }
     }

@@ -134,11 +134,11 @@
 #define STM32_SW                            STM32_SW_PLL1_P_CK
 #define STM32_RTCSEL                        STM32_RTCSEL_NOCLK
 #define STM32_D1CPRE                        STM32_D1CPRE_DIV1
-#define STM32_D1HPRE                        STM32_D1HPRE_DIV4
-#define STM32_D1PPRE3                       STM32_D1PPRE3_DIV1
-#define STM32_D2PPRE1                       STM32_D2PPRE1_DIV1
-#define STM32_D2PPRE2                       STM32_D2PPRE2_DIV1
-#define STM32_D3PPRE4                       STM32_D3PPRE4_DIV1
+#define STM32_D1HPRE                        STM32_D1HPRE_DIV2
+#define STM32_D1PPRE3                       STM32_D1PPRE3_DIV2
+#define STM32_D2PPRE1                       STM32_D2PPRE1_DIV2
+#define STM32_D2PPRE2                       STM32_D2PPRE2_DIV2
+#define STM32_D3PPRE4                       STM32_D3PPRE4_DIV2
 
 /*
  * Peripherals clocks static settings.
@@ -178,7 +178,7 @@
 #define STM32_ADCSEL                        STM32_ADCSEL_PLL3_R_CK
 #define STM32_LPTIM345SEL                   STM32_LPTIM345SEL_PCLK4
 #define STM32_LPTIM2SEL                     STM32_LPTIM2SEL_PCLK4
-#define STM32_I2C4SEL                       STM32_I2C4SEL_PCLK4
+#define STM32_I2C4SEL                       STM32_I2C4SEL_PLL3_R_CK
 #define STM32_LPUART1SEL                    STM32_LPUART1SEL_PCLK4
 #define STM32_SDMMCSEL                      STM32_SDMMCSEL_PLL1_Q_CK
 

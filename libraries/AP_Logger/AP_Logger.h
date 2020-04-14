@@ -159,6 +159,7 @@ enum class LogErrorCode : uint8_t {
     RESTARTED_RTL = 3,
     FAILED_CIRCLE_INIT = 4,
     DEST_OUTSIDE_FENCE = 5,
+    RTL_MISSING_RNGFND = 6,
 
 // parachute failed to deploy because of low altitude or landed
     PARACHUTE_TOO_LOW = 2,
@@ -257,7 +258,9 @@ public:
     void Write_CameraInfo(enum LogMessages msg, const Location &current_loc, uint64_t timestamp_us=0);
     void Write_Camera(const Location &current_loc, uint64_t timestamp_us=0);
     void Write_Trigger(const Location &current_loc);
-    void Write_ESC(uint8_t id, uint64_t time_us, int32_t rpm, uint16_t voltage, uint16_t current, int16_t temperature, uint16_t current_tot);
+    void Write_ESC(uint8_t id, uint64_t time_us, int32_t rpm, uint16_t voltage, uint16_t current, int16_t esc_temp, uint16_t current_tot, int16_t motor_temp);
+    void Write_ServoStatus(uint64_t time_us, uint8_t id, float position, float force, float speed, uint8_t power_pct);
+    void Write_ESCStatus(uint64_t time_us, uint8_t id, uint32_t error_count, float voltage, float current, float temperature, int32_t rpm, uint8_t power_pct);
     void Write_Attitude(const Vector3f &targets);
     void Write_AttitudeView(AP_AHRS_View &ahrs, const Vector3f &targets);
     void Write_Current();
@@ -278,6 +281,7 @@ public:
                           uint8_t sequence,
                           const RallyLocation &rally_point);
     void Write_VisualOdom(float time_delta, const Vector3f &angle_delta, const Vector3f &position_delta, float confidence);
+    void Write_VisualPosition(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, uint8_t reset_counter);
     void Write_AOA_SSA(AP_AHRS &ahrs);
     void Write_Beacon(AP_Beacon &beacon);
     void Write_Proximity(AP_Proximity &proximity);
@@ -359,7 +363,9 @@ public:
     bool vehicle_is_armed() const { return _armed; }
 
     void handle_log_send();
-    bool in_log_download() const { return transfer_activity != IDLE; }
+    bool in_log_download() const {
+        return transfer_activity != TransferActivity::IDLE;
+    }
 
     float quiet_nanf() const { return nanf("0x4152"); } // "AR"
     double quiet_nan() const { return nan("0x4152445550490a"); } // "ARDUPI"
@@ -414,6 +420,7 @@ private:
         const char *units;
         const char *mults;
     } *log_write_fmts;
+    HAL_Semaphore log_write_fmts_sem;
 
     // return (possibly allocating) a log_write_fmt for a name
     struct log_write_fmt *msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt);
@@ -440,10 +447,7 @@ private:
     void Write_Compass_instance(uint64_t time_us,
                                     uint8_t mag_instance,
                                     enum LogMessages type);
-    void Write_Current_instance(uint64_t time_us,
-                                    uint8_t battery_instance,
-                                    enum LogMessages type,
-                                    enum LogMessages celltype);
+    void Write_Current_instance(uint64_t time_us, uint8_t battery_instance);
     void Write_IMUDT_instance(uint64_t time_us,
                                   uint8_t imu_instance,
                                   enum LogMessages type);
@@ -466,6 +470,7 @@ private:
     const char* unit_name(const uint8_t unit_id);
     double multiplier_name(const uint8_t multiplier_id);
     bool seen_ids[256] = { };
+    bool labels_string_is_good(const char *labels) const;
 #endif
 
     // possibly expensive calls to start log system:
@@ -476,11 +481,11 @@ private:
 
     /* support for retrieving logs via mavlink: */
 
-    enum transfer_activity_t : uint8_t {
+    enum class TransferActivity {
         IDLE,    // not doing anything, all file descriptors closed
         LISTING, // actively sending log_entry packets
         SENDING, // actively sending log_sending packets
-    } transfer_activity = IDLE;
+    } transfer_activity = TransferActivity::IDLE;
 
     // next log list entry to send
     uint16_t _log_next_list_entry;
@@ -507,7 +512,7 @@ private:
     uint32_t _log_data_page;
 
     GCS_MAVLINK *_log_sending_link;
-    HAL_Semaphore_Recursive _log_send_sem;
+    HAL_Semaphore _log_send_sem;
 
     // last time arming failed, for backends
     uint32_t _last_arming_failure_ms;

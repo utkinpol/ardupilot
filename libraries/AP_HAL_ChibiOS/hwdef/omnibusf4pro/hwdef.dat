@@ -96,8 +96,6 @@ SPIDEV sdcard     SPI2 DEVID2 SDCARD_CS MODE0 400*KHZ 25*MHZ
 SPIDEV bmp280     SPI3 DEVID3 BMP280_CS MODE3 1*MHZ 8*MHZ
 SPIDEV osd        SPI3 DEVID4 OSD_CS MODE0 10*MHZ 10*MHZ
 
-define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_CHIBIOS_OMNIBUSF4PRO
-
 # one IMU
 IMU Invensense SPI:mpu6000 ROTATION_YAW_180
 
@@ -132,7 +130,7 @@ define BOARD_RSSI_ANA_PIN 0
 
 
 
-define OSD_ENABLED ENABLED
+define OSD_ENABLED 1
 define HAL_OSD_TYPE_DEFAULT 1
 
 #To complementary channels work we define this
@@ -147,3 +145,16 @@ define BOARD_PWM_COUNT_DEFAULT 8
 
 #font for the osd
 ROMFS_WILDCARD libraries/AP_OSD/fonts/font*.bin
+
+# disable SMBUS and fuel battery monitors to save flash
+define HAL_BATTMON_SMBUS_ENABLE 0
+define HAL_BATTMON_FUEL_ENABLE 0
+
+# disable parachute and sprayer to save flash
+define HAL_PARACHUTE_ENABLED 0
+define HAL_SPRAYER_ENABLED 0
+
+define HAL_NAVEKF2_AVAILABLE 0
+
+# reduce max size of embedded params for apj_tool.py
+define AP_PARAM_MAX_EMBEDDED_PARAM 1024

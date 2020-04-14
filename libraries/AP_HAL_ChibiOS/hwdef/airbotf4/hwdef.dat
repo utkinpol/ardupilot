@@ -81,8 +81,6 @@ SPIDEV dataflash  SPI3 DEVID1 FLASH_CS MODE3 32*MHZ 32*MHZ
 # enable logging to dataflash
 define HAL_LOGGING_DATAFLASH
 
-define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_CHIBIOS_AIRBOTF4
-
 # one IMU
 IMU Invensense SPI:mpu6000_cs ROTATION_YAW_180
 
@@ -109,5 +107,8 @@ define HAL_GPIO_A_LED_PIN 57
 
 #To complementary channels work we define this
 define STM32_PWM_USE_ADVANCED TRUE
+
+#eliminate EKF2 to save flash size
+define HAL_NAVEKF2_AVAILABLE 0
 
 define BOARD_PWM_COUNT_DEFAULT 6

@@ -18,6 +18,7 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Scheduler/AP_Scheduler.h>
+#include <AP_Notify/AP_Notify.h>
 #include "AP_ICEngine.h"
 
 extern const AP_HAL::HAL& hal;
@@ -116,7 +117,7 @@ const AP_Param::GroupInfo AP_ICEngine::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("IDLE_RPM", 12, AP_ICEngine, idle_rpm, -1),
 
-    // @Param: ICE_IDLE_DB
+    // @Param: IDLE_DB
     // @DisplayName: Deadband for Idle Governor
     // @Description: This configures the deadband that is tolerated before adjusting the idle setpoint
     AP_GROUPINFO("IDLE_DB", 13, AP_ICEngine, idle_db, 50),
@@ -126,6 +127,12 @@ const AP_Param::GroupInfo AP_ICEngine::var_info[] = {
     // @Description: This configures the slewrate used to adjust the idle setpoint in percentage points per second
     AP_GROUPINFO("IDLE_SLEW", 14, AP_ICEngine, idle_slew, 1),
 
+    // @Param: OPTIONS
+    // @DisplayName: ICE options
+    // @Description: Options for ICE control
+    // @Bitmask: 0:DisableIgnitionRCFailsafe
+    AP_GROUPINFO("OPTIONS", 15, AP_ICEngine, options, 0),
+    
     AP_GROUPEND
 };
 
@@ -167,6 +174,11 @@ void AP_ICEngine::update(void)
         should_run = false;
     } else if (state != ICE_OFF) {
         should_run = true;
+    }
+
+    if ((options & uint16_t(Options::DISABLE_IGNITION_RC_FAILSAFE)) && AP_Notify::flags.failsafe_radio) {
+        // user has requested ignition kill on RC failsafe
+        should_run = false;
     }
 
     // switch on current state to work out new state
@@ -217,8 +229,9 @@ void AP_ICEngine::update(void)
             gcs().send_text(MAV_SEVERITY_INFO, "Stopped engine");
         } else if (rpm_instance > 0) {
             // check RPM to see if still running
-            if (!rpm.healthy(rpm_instance-1) ||
-                rpm.get_rpm(rpm_instance-1) < rpm_threshold) {
+            float rpm_value;
+            if (!rpm.get_rpm(rpm_instance-1, rpm_value) ||
+                rpm_value < rpm_threshold) {
                 // engine has stopped when it should be running
                 state = ICE_START_DELAY;
             }
@@ -353,10 +366,10 @@ void AP_ICEngine::update_idle_governor(int8_t &min_throttle)
     }
 
     // get current RPM feedback
-    uint32_t rpmv = ap_rpm->get_rpm(rpm_instance-1);
+    float rpmv;
 
     // Double Check to make sure engine is really running
-    if (rpmv < 1) {
+    if (!ap_rpm->get_rpm(rpm_instance-1, rpmv) || rpmv < 1) {
         // Reset idle point to the default value when the engine is stopped
         idle_governor_integrator = min_throttle;
         return;
