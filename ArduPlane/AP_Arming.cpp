@@ -165,11 +165,10 @@ bool AP_Arming_Plane::arm_checks(AP_Arming::Method method)
 }
 
 /*
-  update HAL soft arm state and log as needed
+  update HAL soft arm state
 */
 void AP_Arming_Plane::change_arm_state(void)
 {
-    Log_Write_Arm_Disarm();
     update_soft_armed();
     plane.quadplane.set_armed(hal.util->get_soft_armed());
 }
@@ -190,9 +189,9 @@ bool AP_Arming_Plane::arm(const AP_Arming::Method method, const bool do_arming_c
 /*
   disarm motors
  */
-bool AP_Arming_Plane::disarm(void)
+bool AP_Arming_Plane::disarm(const AP_Arming::Method method)
 {
-    if (!AP_Arming::disarm()) {
+    if (!AP_Arming::disarm(method)) {
         return false;
     }
     if (plane.control_mode != &plane.mode_auto) {

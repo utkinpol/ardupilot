@@ -5,9 +5,8 @@
 #include <AP_Baro/AP_Baro.h>
 #include <AP_Airspeed/AP_Airspeed.h>
 #include <AP_RangeFinder/AP_RangeFinder.h>
-#include <AP_Common/AP_FWVersion.h>
-#include "version.h"
 #include "../AP_Bootloader/app_comms.h"
+#include "hwing_esc.h"
 
 #if defined(HAL_PERIPH_NEOPIXEL_COUNT) || defined(HAL_PERIPH_ENABLE_NCP5623_LED)
 #define AP_PERIPH_HAVE_LED
@@ -68,6 +67,24 @@ public:
 
 #ifdef HAL_PERIPH_ENABLE_RANGEFINDER
     RangeFinder rangefinder;
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_PWM_HARDPOINT
+    void pwm_irq_handler(uint8_t pin, bool pin_state, uint32_t timestamp);
+    void pwm_hardpoint_init();
+    void pwm_hardpoint_update();
+    struct {
+        uint8_t last_state;
+        uint32_t last_ts_us;
+        uint32_t last_send_ms;
+        uint16_t pwm_value;
+        uint16_t highest_pwm;
+    } pwm_hardpoint;
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_HWESC
+    HWESC_Telem hwesc_telem;
+    void hwesc_telem_update();
 #endif
     
     // setup the var_info table

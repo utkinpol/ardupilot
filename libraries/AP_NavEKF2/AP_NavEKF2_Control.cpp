@@ -250,6 +250,9 @@ void NavEKF2_core::setAidingMode()
             tasTimeout = true;
             gpsNotAvailable = true;
         } else if (posAidLossCritical) {
+            if ((frontend->_flowUse == FLOW_USE_NAV) && optFlowDataPresent() && (imuSampleTime_ms - rngValidMeaTime_ms < 500)) {
+                PV_AidingMode = AID_NONE;
+            }
             // if the loss of position is critical, declare all sources of position aiding as being timed out
             posTimeout = true;
             velTimeout = true;
@@ -518,5 +521,6 @@ void  NavEKF2_core::updateFilterStatus(void)
     filterStatus.flags.using_gps = ((imuSampleTime_ms - lastPosPassTime_ms) < 4000) && (PV_AidingMode == AID_ABSOLUTE);
     filterStatus.flags.gps_glitching = !gpsAccuracyGood && (PV_AidingMode == AID_ABSOLUTE) && !extNavUsedForPos; // GPS glitching is affecting navigation accuracy
     filterStatus.flags.gps_quality_good = gpsGoodToAlign;
+    filterStatus.flags.initalized = filterStatus.flags.initalized || healthy();
 }
 

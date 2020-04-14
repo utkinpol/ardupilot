@@ -163,6 +163,12 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
 #endif
 
+#if MODE_AUTOROTATE_ENABLED == ENABLED
+        case Mode::Number::AUTOROTATE:
+            ret = &mode_autorotate;
+            break;
+#endif
+
         default:
             break;
     }
@@ -196,10 +202,21 @@ bool Copter::set_mode(Mode::Number mode, ModeReason reason)
 #if FRAME_CONFIG == HELI_FRAME
     // do not allow helis to enter a non-manual throttle mode if the
     // rotor runup is not complete
-    if (!ignore_checks && !new_flightmode->has_manual_throttle() && (motors->get_spool_state() == AP_Motors::SpoolState::SPOOLING_UP || motors->get_spool_state() == AP_Motors::SpoolState::SPOOLING_DOWN)) {
-        gcs().send_text(MAV_SEVERITY_WARNING,"Flight mode change failed");
-        AP::logger().Write_Error(LogErrorSubsystem::FLIGHT_MODE, LogErrorCode(mode));
-        return false;
+    if (!ignore_checks && !new_flightmode->has_manual_throttle() &&
+        (motors->get_spool_state() == AP_Motors::SpoolState::SPOOLING_UP || motors->get_spool_state() == AP_Motors::SpoolState::SPOOLING_DOWN)) {
+        #if MODE_AUTOROTATE_ENABLED == ENABLED
+            //if the mode being exited is the autorotation mode allow mode change despite rotor not being at
+            //full speed.  This will reduce altitude loss on bail-outs back to non-manual throttle modes
+            bool in_autorotation_check = (flightmode != &mode_autorotate || new_flightmode != &mode_autorotate);
+        #else
+            bool in_autorotation_check = false;
+        #endif
+
+        if (!in_autorotation_check) {
+            gcs().send_text(MAV_SEVERITY_WARNING,"Flight mode change failed %s", new_flightmode->name());
+            AP::logger().Write_Error(LogErrorSubsystem::FLIGHT_MODE, LogErrorCode(mode));
+            return false;
+        }
     }
 #endif
 
@@ -234,13 +251,16 @@ bool Copter::set_mode(Mode::Number mode, ModeReason reason)
     }
 
     if (!new_flightmode->init(ignore_checks)) {
-        gcs().send_text(MAV_SEVERITY_WARNING,"Flight mode change failed");
+        gcs().send_text(MAV_SEVERITY_WARNING,"Flight mode change failed %s", new_flightmode->name());
         AP::logger().Write_Error(LogErrorSubsystem::FLIGHT_MODE, LogErrorCode(mode));
         return false;
     }
 
     // perform any cleanup required by previous flight mode
     exit_mode(flightmode, new_flightmode);
+
+    // store previous flight mode (only used by tradeheli's autorotation)
+    prev_control_mode = control_mode;
 
     // update flight mode
     flightmode = new_flightmode;
@@ -333,6 +353,12 @@ void Copter::exit_mode(Mode *&old_flightmode,
 #if MODE_FOLLOW_ENABLED == ENABLED
     if (old_flightmode == &mode_follow) {
         mode_follow.exit();
+    }
+#endif
+
+#if MODE_ZIGZAG_ENABLED == ENABLED
+    if (old_flightmode == &mode_zigzag) {
+        mode_zigzag.exit();
     }
 #endif
 
@@ -481,31 +507,23 @@ void Mode::make_safe_spool_down()
  */
 int32_t Mode::get_alt_above_ground_cm(void)
 {
-    int32_t alt_above_ground;
-    if (copter.rangefinder_alt_ok()) {
-        alt_above_ground = copter.rangefinder_state.alt_cm_filt.get();
-    } else {
-        bool navigating = pos_control->is_active_xy();
-        if (!navigating || !copter.current_loc.get_alt_cm(Location::AltFrame::ABOVE_TERRAIN, alt_above_ground)) {
-            alt_above_ground = copter.current_loc.alt;
-        }
+    int32_t alt_above_ground_cm;
+    if (copter.get_rangefinder_height_interpolated_cm(alt_above_ground_cm)) {
+        return alt_above_ground_cm;
     }
-    return alt_above_ground;
+    if (!pos_control->is_active_xy()) {
+        return copter.current_loc.alt;
+    }
+    if (copter.current_loc.get_alt_cm(Location::AltFrame::ABOVE_TERRAIN, alt_above_ground_cm)) {
+        return alt_above_ground_cm;
+    }
+
+    // Assume the Earth is flat:
+    return copter.current_loc.alt;
 }
 
 void Mode::land_run_vertical_control(bool pause_descent)
 {
-#if PRECISION_LANDING == ENABLED
-    const bool navigating = pos_control->is_active_xy();
-    bool doing_precision_landing = !copter.ap.land_repo_active && copter.precland.target_acquired() && navigating;
-#else
-    bool doing_precision_landing = false;
-#endif
-
-    // compute desired velocity
-    const float precland_acceptable_error = 15.0f;
-    const float precland_min_descent_speed = 10.0f;
-
     float cmb_rate = 0;
     if (!pause_descent) {
         float max_land_descent_velocity;
@@ -524,11 +542,20 @@ void Mode::land_run_vertical_control(bool pause_descent)
         // Constrain the demanded vertical velocity so that it is between the configured maximum descent speed and the configured minimum descent speed.
         cmb_rate = constrain_float(cmb_rate, max_land_descent_velocity, -abs(g.land_speed));
 
+#if PRECISION_LANDING == ENABLED
+        const bool navigating = pos_control->is_active_xy();
+        bool doing_precision_landing = !copter.ap.land_repo_active && copter.precland.target_acquired() && navigating;
+
         if (doing_precision_landing && copter.rangefinder_alt_ok() && copter.rangefinder_state.alt_cm > 35.0f && copter.rangefinder_state.alt_cm < 200.0f) {
+            // compute desired velocity
+            const float precland_acceptable_error = 15.0f;
+            const float precland_min_descent_speed = 10.0f;
+
             float max_descent_speed = abs(g.land_speed)*0.5f;
             float land_slowdown = MAX(0.0f, pos_control->get_horizontal_error()*(max_descent_speed/precland_acceptable_error));
             cmb_rate = MIN(-precland_min_descent_speed, -max_descent_speed+land_slowdown);
         }
+#endif
     }
 
     // update altitude target and call position controller

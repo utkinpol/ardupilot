@@ -23,6 +23,11 @@ public:
         k_param_rangefinder,
         k_param_flash_bootloader,
         k_param_rangefinder_baud,
+        k_param_adsb_baudrate,
+        k_param_hardpoint_id,
+        k_param_hardpoint_rate,
+        k_param_baro_enable,
+        k_param_esc_number,
     };
 
     AP_Int16 format_version;
@@ -34,7 +39,9 @@ public:
 #ifdef AP_PERIPH_HAVE_LED
     AP_Int8 led_brightness;
 #endif
-
+#ifdef HAL_PERIPH_ENABLE_BARO
+    AP_Int8 baro_enable;
+#endif
 #if !defined(HAL_NO_FLASH_SUPPORT) && !defined(HAL_NO_ROMFS_SUPPORT)
     AP_Int8 flash_bootloader;
 #endif
@@ -42,6 +49,20 @@ public:
 #ifdef HAL_PERIPH_ENABLE_RANGEFINDER
     AP_Int32 rangefinder_baud;
 #endif
+
+#ifdef HAL_PERIPH_ENABLE_ADSB
+    AP_Int32 adsb_baudrate;
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_PWM_HARDPOINT
+    AP_Int16 hardpoint_id;
+    AP_Int8 hardpoint_rate;
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_HWESC
+    AP_Int8 esc_number;
+#endif
+    
     Parameters() {}
 };
 

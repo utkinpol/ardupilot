@@ -24,7 +24,6 @@
 #include "AP_Proximity_SITL.h"
 #include "AP_Proximity_MorseSITL.h"
 #include "AP_Proximity_AirSimSITL.h"
-#include <AP_AHRS/AP_AHRS.h>
 
 extern const AP_HAL::HAL &hal;
 
@@ -345,24 +344,6 @@ void AP_Proximity::detect_instance(uint8_t instance)
         return;
 #endif
     }
-}
-
-// get distance in meters in a particular direction in degrees (0 is forward, clockwise)
-// returns true on successful read and places distance in distance
-bool AP_Proximity::get_horizontal_distance(uint8_t instance, float angle_deg, float &distance) const
-{
-    if (!valid_instance(instance)) {
-        return false;
-    }
-    // get distance from backend
-    return drivers[instance]->get_horizontal_distance(angle_deg, distance);
-}
-
-// get distance in meters in a particular direction in degrees (0 is forward, clockwise)
-// returns true on successful read and places distance in distance
-bool AP_Proximity::get_horizontal_distance(float angle_deg, float &distance) const
-{
-    return get_horizontal_distance(primary_instance, angle_deg, distance);
 }
 
 // get distances in 8 directions. used for sending distances to ground station

@@ -19,6 +19,7 @@
 #include "GPIO.h"
 #include "SITL_State.h"
 #include "Util.h"
+#include "DSP.h"
 
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <AP_HAL_Empty/AP_HAL_Empty.h>
@@ -35,6 +36,8 @@ static RCInput  sitlRCInput(&sitlState);
 static RCOutput sitlRCOutput(&sitlState);
 static AnalogIn sitlAnalogIn(&sitlState);
 static GPIO sitlGPIO(&sitlState);
+static DSP dspDriver;
+
 
 // use the Empty HAL for hardware we don't emulate
 static Empty::I2CDeviceManager i2c_mgr_instance;
@@ -73,8 +76,9 @@ HAL_SITL::HAL_SITL() :
         &sitlRCOutput,      /* rcoutput */
         &sitlScheduler,     /* scheduler */
         &utilInstance,      /* util */
-        &emptyOpticalFlow, /* onboard optical flow */
-        &emptyFlash, /* flash driver */
+        &emptyOpticalFlow,  /* onboard optical flow */
+        &emptyFlash,        /* flash driver */
+        &dspDriver,         /* dsp driver */
         nullptr),           /* CAN */
     _sitl_state(&sitlState)
 {}
@@ -165,6 +169,7 @@ void HAL_SITL::run(int argc, char * const argv[], Callbacks* callbacks) const
         AP::internalerror().error(AP_InternalError::error_t::watchdog_reset);
         if (watchdog_load((uint32_t *)&utilInstance.persistent_data, (sizeof(utilInstance.persistent_data)+3)/4)) {
             uartA->printf("Loaded watchdog data");
+            utilInstance.last_persistent_data = utilInstance.persistent_data;
         }
     }
 

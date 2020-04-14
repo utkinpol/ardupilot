@@ -4,8 +4,6 @@
 # MCU class and specific type
 MCU STM32F4xx STM32F405xx
 
-define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_CHIBIOS_REVOMINI
-
 # board ID for firmware load
 APJ_BOARD_ID 124
 
@@ -136,6 +134,10 @@ SPIDEV dataflash SPI3 DEVID1 FLASH_CS MODE3 32*MHZ 32*MHZ
 # enable logging to dataflash
 define HAL_LOGGING_DATAFLASH
 
+#eliminate EKF2 to save flash size
+define HAL_NAVEKF2_AVAILABLE 0
+
 # 8 PWM available by default
 define BOARD_PWM_COUNT_DEFAULT 8
+define HAL_WITH_DSP FALSE
 

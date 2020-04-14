@@ -47,13 +47,13 @@ bool ModeGuided::init(bool ignore_checks)
 
 
 // do_user_takeoff_start - initialises waypoint controller to implement take-off
-bool ModeGuided::do_user_takeoff_start(float final_alt_above_home)
+bool ModeGuided::do_user_takeoff_start(float takeoff_alt_cm)
 {
     guided_mode = Guided_TakeOff;
 
     // initialise wpnav destination
     Location target_loc = copter.current_loc;
-    target_loc.set_alt_cm(final_alt_above_home, Location::AltFrame::ABOVE_HOME);
+    target_loc.set_alt_cm(takeoff_alt_cm, Location::AltFrame::ABOVE_HOME);
 
     if (!wp_nav->set_wp_destination(target_loc)) {
         // failure to set destination can only be because of missing terrain data
@@ -176,7 +176,7 @@ void ModeGuided::angle_control_start()
 // guided_set_destination - sets guided mode's target destination
 // Returns true if the fence is enabled and guided waypoint is within the fence
 // else return false if the waypoint is outside the fence
-bool ModeGuided::set_destination(const Vector3f& destination, bool use_yaw, float yaw_cd, bool use_yaw_rate, float yaw_rate_cds, bool relative_yaw)
+bool ModeGuided::set_destination(const Vector3f& destination, bool use_yaw, float yaw_cd, bool use_yaw_rate, float yaw_rate_cds, bool relative_yaw, bool terrain_alt)
 {
     // ensure we are in position control mode
     if (guided_mode != Guided_WP) {
@@ -197,7 +197,7 @@ bool ModeGuided::set_destination(const Vector3f& destination, bool use_yaw, floa
     set_yaw_state(use_yaw, yaw_cd, use_yaw_rate, yaw_rate_cds, relative_yaw);
 
     // no need to check return status because terrain data is not used
-    wp_nav->set_wp_destination(destination, false);
+    wp_nav->set_wp_destination(destination, terrain_alt);
 
     // log target
     copter.Log_Write_GuidedTarget(guided_mode, destination, Vector3f());
@@ -370,6 +370,10 @@ void ModeGuided::takeoff_run()
 {
     auto_takeoff_run();
     if (wp_nav->reached_wp_destination()) {
+        // optionally retract landing gear
+        copter.landinggear.retract_after_takeoff();
+
+        // switch to position control mode but maintain current target
         const Vector3f& target = wp_nav->get_wp_destination();
         set_destination(target);
     }

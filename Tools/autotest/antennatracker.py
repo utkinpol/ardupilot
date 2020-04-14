@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import math
+import operator
 import os
 
 from pymavlink import mavextra
@@ -35,6 +36,9 @@ class AutoTestTracker(AutoTest):
     def default_frame(self):
         return "tracker"
 
+    def set_current_test_name(self, name):
+        self.current_test_name_directory = "AntennaTracker_Tests/" + name + "/"
+
     def apply_defaultfile_parameters(self):
         # tracker doesn't have a default parameters file
         pass
@@ -50,7 +54,7 @@ class AutoTestTracker(AutoTest):
         self.progress("Using set_attitude_target to achieve attitude")
         while True:
             now = self.get_sim_time()
-            if now - tstart > 30:
+            if now - tstart > 60:
                 raise NotAchievedException("Did not achieve attitude")
             if now - last_attitude_target_sent > 0.5:
                 last_attitude_target_sent = now
@@ -84,15 +88,70 @@ class AutoTestTracker(AutoTest):
                 self.progress("Achieved attitude")
                 break
 
+    def reboot_sitl(self, *args, **kwargs):
+        self.disarm_vehicle()
+        super(AutoTestTracker, self).reboot_sitl(*args, **kwargs)
+
     def GUIDED(self):
+        self.reboot_sitl() # temporary hack around control issues
         self.change_mode(4) # "GUIDED"
         self.achieve_attitude(desyaw=10, despitch=30)
         self.achieve_attitude(desyaw=0, despitch=0)
         self.achieve_attitude(desyaw=45, despitch=10)
 
+    def MANUAL(self):
+        self.change_mode(0) # "MANUAL"
+        for chan in 1, 2:
+            for pwm in 1200, 1600, 1367:
+                self.set_rc(chan, pwm);
+                self.wait_servo_channel_value(chan, pwm)
+
+    def SERVOTEST(self):
+        self.change_mode(0) # "MANUAL"
+        # magically changes to SERVOTEST (3)
+        for value in 1900, 1200:
+            channel = 1
+            self.run_cmd(mavutil.mavlink.MAV_CMD_DO_SET_SERVO,
+                         channel,
+                         value,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         timeout=1)
+            self.wait_servo_channel_value(channel, value)
+        for value in 1300, 1670:
+            channel = 2
+            self.run_cmd(mavutil.mavlink.MAV_CMD_DO_SET_SERVO,
+                         channel,
+                         value,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         timeout=1)
+            self.wait_servo_channel_value(channel, value)
+
+    def SCAN(self):
+        self.change_mode(2) # "SCAN"
+        self.set_parameter("SCAN_SPEED_YAW", 20)
+        for channel in 1, 2:
+            self.wait_servo_channel_value(channel,
+                                          1900,
+                                          timeout=90,
+                                          comparator=operator.ge)
+        for channel in 1, 2:
+            self.wait_servo_channel_value(channel,
+                                          1200,
+                                          timeout=90,
+                                          comparator=operator.le)
+
     def disabled_tests(self):
         return {
             "ArmFeatures": "See https://github.com/ArduPilot/ardupilot/issues/10652",
+            "CPUFailsafe": " tracker doesn't have a CPU failsafe",
         }
 
     def tests(self):
@@ -102,5 +161,21 @@ class AutoTestTracker(AutoTest):
             ("GUIDED",
              "Test GUIDED mode",
              self.GUIDED),
+
+            ("MANUAL",
+             "Test MANUAL mode",
+             self.MANUAL),
+
+            ("SERVOTEST",
+             "Test SERVOTEST mode",
+             self.SERVOTEST),
+
+            ("NMEAOutput",
+             "Test AHRS NMEA Output can be read by out NMEA GPS",
+             self.nmea_output),
+
+            ("SCAN",
+             "Test SCAN mode",
+             self.SCAN),
         ])
         return ret

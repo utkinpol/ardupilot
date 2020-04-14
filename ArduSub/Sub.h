@@ -68,7 +68,6 @@
 #include <AP_JSButton/AP_JSButton.h>   // Joystick/gamepad button function assignment
 #include <AP_LeakDetector/AP_LeakDetector.h> // Leak detector
 #include <AP_TemperatureSensor/TSYS01.h>
-#include <AP_Common/AP_FWVersion.h>
 
 // Local modules
 #include "defines.h"
@@ -131,12 +130,7 @@ public:
 
     Sub(void);
 
-    // HAL::Callbacks implementation.
-    void setup() override;
-    void loop() override;
-
 private:
-    static const AP_FWVersion fwver;
 
     // key aircraft parameters passed to multiple libraries
     AP_Vehicle::MultiCopter aparm;
@@ -144,9 +138,6 @@ private:
     // Global parameters are all contained within the 'g' class.
     Parameters g;
     ParametersG2 g2;
-
-    // main loop scheduler
-    AP_Scheduler scheduler{FUNCTOR_BIND_MEMBER(&Sub::fast_loop, void)};
 
     // primary input control channels
     RC_Channel *channel_roll;
@@ -173,11 +164,6 @@ private:
 #if RPM_ENABLED == ENABLED
     AP_RPM rpm_sensor;
 #endif
-
-    // Inertial Navigation EKF
-    NavEKF2 EKF2{&ahrs, rangefinder};
-    NavEKF3 EKF3{&ahrs, rangefinder};
-    AP_AHRS_NavEKF ahrs{EKF2, EKF3, AP_AHRS_NavEKF::FLAG_ALWAYS_USE_EKF};
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     SITL::SITL sitl;
@@ -218,7 +204,7 @@ private:
             uint8_t at_bottom           : 1; // true if we are at the bottom
             uint8_t at_surface          : 1; // true if we are at the surface
             uint8_t depth_sensor_present: 1; // true if there is a depth sensor detected at boot
-            uint8_t compass_init_location:1; // true when the compass's initial location has been set
+            uint8_t unused1             : 1; // was compass_init_location; true when the compass's initial location has been set
         };
         uint32_t value;
     } ap;
@@ -322,6 +308,9 @@ private:
     // Flag indicating if we are currently using input hold
     bool input_hold_engaged;
 
+    // Flag indicating if we are currently controlling Pitch and Roll instead of forward/lateral
+    bool roll_pitch_flag = false;
+
     // 3D Location vectors
     // Current location of the Sub (altitude is relative to home)
     Location current_loc;
@@ -350,11 +339,6 @@ private:
     // Delay Mission Scripting Command
     int32_t condition_value;  // used in condition commands (eg delay, change alt, etc.)
     uint32_t condition_start;
-
-    // IMU variables
-    // Integration time (in seconds) for the gyros (DCM algorithm)
-    // Updated with the fast loop
-    float G_Dt;
 
     // Inertial Navigation
     AP_InertialNav_NavEKF inertial_nav;
@@ -420,7 +404,7 @@ private:
     static const AP_Param::Info var_info[];
     static const struct LogStructure log_structure[];
 
-    void fast_loop();
+    void fast_loop() override;
     void fifty_hz_loop();
     void update_batt_compass(void);
     void ten_hz_logging_loop();
@@ -457,7 +441,7 @@ private:
     void Log_Sensor_Health();
     void Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target);
     void Log_Write_Vehicle_Startup_Messages();
-    void load_parameters(void);
+    void load_parameters(void) override;
     void userhook_init();
     void userhook_FastLoop();
     void userhook_50Hz();
@@ -545,6 +529,7 @@ private:
     void fence_check();
     bool set_mode(control_mode_t mode, ModeReason reason);
     bool set_mode(const uint8_t mode, const ModeReason reason) override;
+    uint8_t get_mode() const override { return (uint8_t)control_mode; }
     void update_flight_mode();
     void exit_mode(control_mode_t old_control_mode, control_mode_t new_control_mode);
     bool mode_requires_GPS(control_mode_t mode);
@@ -577,8 +562,10 @@ private:
 #endif
     void terrain_update();
     void terrain_logging();
-    bool terrain_use();
-    void init_ardupilot();
+    void init_ardupilot() override;
+    void get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
+                             uint8_t &task_count,
+                             uint32_t &log_bit) override;
     void startup_INS_ground();
     bool position_ok();
     bool ekf_position_ok();
@@ -670,7 +657,6 @@ private:
 
 
 public:
-    void mavlink_delay_cb();
     void mainloop_failsafe_check();
 };
 

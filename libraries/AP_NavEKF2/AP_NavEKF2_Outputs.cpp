@@ -5,6 +5,7 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_GPS/AP_GPS.h>
+#include <AP_RangeFinder/AP_RangeFinder.h>
 
 #include <stdio.h>
 
@@ -103,7 +104,12 @@ bool NavEKF2_core::getHeightControlLimit(float &height) const
     // only ask for limiting if we are doing optical flow only navigation
     if (frontend->_fusionModeGPS == 3 && (PV_AidingMode == AID_RELATIVE) && flowDataValid) {
         // If are doing optical flow nav, ensure the height above ground is within range finder limits after accounting for vehicle tilt and control errors
-        height = MAX(float(frontend->_rng.max_distance_cm_orient(ROTATION_PITCH_270)) * 0.007f - 1.0f, 1.0f);
+        const RangeFinder *_rng = AP::rangefinder();
+        if (_rng == nullptr) {
+            // we really, really shouldn't be here.
+            return false;
+        }
+        height = MAX(float(_rng->max_distance_cm_orient(ROTATION_PITCH_270)) * 0.007f - 1.0f, 1.0f);
         // If we are are not using the range finder as the height reference, then compensate for the difference between terrain and EKF origin
         if (frontend->_altSource != 1) {
             height -= terrainState;
@@ -537,7 +543,7 @@ void  NavEKF2_core::getFilterGpsStatus(nav_gps_status &faults) const
 }
 
 // send an EKF_STATUS message to GCS
-void NavEKF2_core::send_status_report(mavlink_channel_t chan)
+void NavEKF2_core::send_status_report(mavlink_channel_t chan) const
 {
     // prepare flags
     uint16_t flags = 0;
@@ -571,12 +577,17 @@ void NavEKF2_core::send_status_report(mavlink_channel_t chan)
     if (filterStatus.flags.pred_horiz_pos_abs) {
         flags |= EKF_PRED_POS_HORIZ_ABS;
     }
+    if (!filterStatus.flags.initalized) {
+        flags |= EKF_UNINITIALIZED;
+    }
 
     // get variances
     float velVar, posVar, hgtVar, tasVar;
     Vector3f magVar;
     Vector2f offset;
     getVariances(velVar, posVar, hgtVar, magVar, tasVar, offset);
+
+    const float mag_max = fmaxf(fmaxf(magVar.x,magVar.y),magVar.z);
 
     // Only report range finder normalised innovation levels if the EKF needs the data for primary
     // height estimation or optical flow operation. This prevents false alarms at the GCS if a
@@ -589,7 +600,7 @@ void NavEKF2_core::send_status_report(mavlink_channel_t chan)
     }
 
     // send message
-    mavlink_msg_ekf_status_report_send(chan, flags, velVar, posVar, hgtVar, magVar.length(), temp, tasVar);
+    mavlink_msg_ekf_status_report_send(chan, flags, velVar, posVar, hgtVar, mag_max, temp, tasVar);
 }
 
 // report the reason for why the backend is refusing to initialise

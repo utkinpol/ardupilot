@@ -21,7 +21,7 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_RTC/AP_RTC.h>
-#include <AP_Vehicle/AP_Vehicle_Type.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 #include <GCS_MAVLink/GCS.h>
 
 #if HAL_WITH_UAVCAN
@@ -141,10 +141,10 @@ const AP_Param::GroupInfo AP_BoardConfig::var_info[] = {
 
 #if HAL_HAVE_SAFETY_SWITCH
     // @Param: SAFETY_MASK
-    // @DisplayName: Channels which ignore the safety switch state
-    // @Description: A bitmask which controls what channels can move while the safety switch has not been pressed
+    // @DisplayName: Outputs which ignore the safety switch state
+    // @Description: A bitmask which controls what outputs can move while the safety switch has not been pressed
     // @Values: 0:Disabled,1:Enabled
-    // @Bitmask: 0:Ch1,1:Ch2,2:Ch3,3:Ch4,4:Ch5,5:Ch6,6:Ch7,7:Ch8,8:Ch9,9:Ch10,10:Ch11,11:Ch12,12:Ch13,13:Ch14
+    // @Bitmask: 0:Output1,1:Output2,2:Output3,3:Output4,4:Output5,5:Output6,6:Output7,7:Output8,8:Output9,9:Output10,10:Output11,11:Output12,12:Output13,13:Output14
     // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("SAFETY_MASK", 7, AP_BoardConfig, state.ignore_safety_channels, 0),
@@ -170,8 +170,7 @@ const AP_Param::GroupInfo AP_BoardConfig::var_info[] = {
     AP_GROUPINFO("TYPE", 9, AP_BoardConfig, state.board_type, BOARD_TYPE_DEFAULT),
 #endif
 
-#if AP_FEATURE_BOARD_DETECT
-#if HAL_PX4_HAVE_PX4IO || HAL_WITH_IO_MCU
+#if HAL_WITH_IO_MCU
     // @Param: IO_ENABLE
     // @DisplayName: Enable IO co-processor
     // @Description: This allows for the IO co-processor on FMUv1 and FMUv2 to be disabled
@@ -179,7 +178,6 @@ const AP_Param::GroupInfo AP_BoardConfig::var_info[] = {
     // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("IO_ENABLE", 10, AP_BoardConfig, state.io_enable, 1),
-#endif
 #endif
 
 #if HAL_RCINPUT_WITH_AP_RADIO
@@ -279,6 +277,15 @@ const AP_Param::GroupInfo AP_BoardConfig::var_info[] = {
     // @User: Advanced
     AP_SUBGROUPINFO(heater.pi_controller, "IMUHEAT_",  21, AP_BoardConfig, AC_PI),
 #endif
+
+    // @Param: ALT_CONFIG
+    // @DisplayName: Alternative HW config
+    // @Description: Select an alternative hardware configuration. A value of zero selects the default configuration for this board. Other values are board specific. Please see the documentation for your board for details on any alternative configuration values that may be available.
+    // @Range: 0 10
+    // @Increment: 1
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("ALT_CONFIG", 22, AP_BoardConfig, _alt_config, 0),
     
     AP_GROUPEND
 };

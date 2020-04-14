@@ -1,5 +1,13 @@
 #pragma once
-// auto generated bindings, don't manually edit
+// auto generated bindings, don't manually edit.  See README.md for details.
+#include <AP_Button/AP_Button.h>
+#include <AP_RPM/AP_RPM.h>
+#include <AP_Mission/AP_Mission.h>
+#include <AP_Param/AP_Param.h>
+#include <AP_ESC_Telem/AP_ESC_Telem.h>
+#include <AP_Baro/AP_Baro.h>
+#include <AP_SerialManager/AP_SerialManager.h>
+#include <RC_Channel/RC_Channel.h>
 #include <SRV_Channel/SRV_Channel.h>
 #include <AP_SerialLED/AP_SerialLED.h>
 #include <AP_Vehicle/AP_Vehicle.h>
@@ -29,5 +37,7 @@ int new_Vector3f(lua_State *L);
 Vector3f * check_Vector3f(lua_State *L, int arg);
 int new_Location(lua_State *L);
 Location * check_Location(lua_State *L, int arg);
+int new_AP_HAL__UARTDriver(lua_State *L);
+AP_HAL::UARTDriver ** check_AP_HAL__UARTDriver(lua_State *L, int arg);
 void load_generated_bindings(lua_State *L);
 void load_generated_sandbox(lua_State *L);

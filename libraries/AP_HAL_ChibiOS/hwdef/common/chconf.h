@@ -266,7 +266,7 @@
  * @note    Requires @p CH_CFG_USE_MUTEXES.
  */
 #if !defined(CH_CFG_USE_MUTEXES_RECURSIVE)
-#define CH_CFG_USE_MUTEXES_RECURSIVE        FALSE
+#define CH_CFG_USE_MUTEXES_RECURSIVE        TRUE
 #endif
 
 /**
@@ -725,6 +725,8 @@
 #define CH_CFG_SYSTEM_HALT_HOOK(reason) do {                               \
         extern void memory_flush_all(void); \
         memory_flush_all(); \
+        extern void system_halt_hook(void); \
+        system_halt_hook(); \
 } while(0)
 #endif
 

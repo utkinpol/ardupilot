@@ -80,25 +80,16 @@ const AP_Scheduler::Task Sub::scheduler_tasks[] = {
 #endif
 };
 
+void Sub::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
+                                 uint8_t &task_count,
+                                 uint32_t &log_bit)
+{
+    tasks = &scheduler_tasks[0];
+    task_count = ARRAY_SIZE(scheduler_tasks);
+    log_bit = MASK_LOG_PM;
+}
+
 constexpr int8_t Sub::_failsafe_priorities[5];
-
-void Sub::setup()
-{
-    // Load the default values of variables listed in var_info[]s
-    AP_Param::setup_sketch_defaults();
-
-    init_ardupilot();
-
-    // initialise the main loop scheduler
-    scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks), MASK_LOG_PM);
-}
-
-void Sub::loop()
-{
-    scheduler.loop();
-    G_Dt = scheduler.get_loop_period_s();
-}
-
 
 // Main loop - 400hz
 void Sub::fast_loop()
@@ -290,7 +281,7 @@ void Sub::one_hz_loop()
 
     // need to set "likely flying" when armed to allow for compass
     // learning to run
-    ahrs.set_likely_flying(hal.util->get_soft_armed());
+    set_likely_flying(hal.util->get_soft_armed());
 }
 
 // called at 50hz
@@ -334,6 +325,9 @@ void Sub::update_altitude()
 
     if (should_log(MASK_LOG_CTUN)) {
         Log_Write_Control_Tuning();
+#if HAL_GYROFFT_ENABLED
+        gyro_fft.write_log_messages();
+#endif
     }
 }
 

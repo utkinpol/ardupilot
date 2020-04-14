@@ -139,6 +139,8 @@ void AP_RCProtocol_DSM::dsm_guess_format(bool reset, const uint8_t dsm_frame[16]
         0xff,	/* 8 channels (DX8) */
         0x1ff,	/* 9 channels (DX9, etc.) */
         0x3ff,	/* 10 channels (DX10) */
+        0x7ff,	/* 11 channels DX8 22ms */
+        0xfff,	/* 12 channels DX8 22ms */
         0x1fff,	/* 13 channels (DX10t) */
         0x3fff	/* 18 channels (DX10) */
     };
@@ -267,6 +269,7 @@ bool AP_RCProtocol_DSM::dsm_decode(uint32_t frame_time_ms, const uint8_t dsm_fra
 
         case 2:
             channel = 1;
+            break;
 
         default:
             break;
@@ -421,6 +424,8 @@ bool AP_RCProtocol_DSM::dsm_parse_byte(uint32_t frame_time_ms, uint8_t b, uint16
         if (byte_input.ofs < DSM_FRAME_SIZE) {
             break;
         }
+
+        log_data(AP_RCProtocol::DSM, frame_time_ms*1000U, byte_input.buf, byte_input.ofs);
 
         /*
          * Great, it looks like we might have a frame.  Go ahead and

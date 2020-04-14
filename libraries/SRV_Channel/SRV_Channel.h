@@ -15,7 +15,6 @@
 
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
-#include <AP_RCMapper/AP_RCMapper.h>
 #include <AP_Common/Bitmask.h>
 #include <AP_Volz_Protocol/AP_Volz_Protocol.h>
 #include <AP_RobotisServo/AP_RobotisServo.h>
@@ -53,7 +52,7 @@ public:
         k_mount_roll            = 8,            ///< mount roll
         k_mount_open            = 9,            ///< mount open (deploy) / close (retract)
         k_cam_trigger           = 10,           ///< camera trigger
-        k_egg_drop              = 11,           ///< egg drop
+        k_egg_drop              = 11,           ///< egg drop, deprecated
         k_mount2_pan            = 12,           ///< mount2 yaw (pan)
         k_mount2_tilt           = 13,           ///< mount2 pitch (tilt)
         k_mount2_roll           = 14,           ///< mount2 roll
@@ -101,7 +100,7 @@ public:
         k_rcin15                = 65,
         k_rcin16                = 66,
         k_ignition              = 67,
-        k_choke                 = 68,
+        k_choke                 = 68,           /// not used
         k_starter               = 69,
         k_throttle              = 70,
         k_tracker_yaw           = 71,            ///< antennatracker yaw
@@ -151,15 +150,20 @@ public:
         k_pitch_out             = 125,
         k_thrust_out            = 126,
         k_yaw_out               = 127,
+        k_wingsail_elevator     = 128,
+        k_ProfiLED_1            = 129,
+        k_ProfiLED_2            = 130,
+        k_ProfiLED_3            = 131,
+        k_ProfiLED_Clock        = 132,
         k_nr_aux_servo_functions         ///< This must be the last enum value (only add new values _before_ this one)
     } Aux_servo_function_t;
 
     // used to get min/max/trim limit value based on reverse
-    enum LimitValue {
-        SRV_CHANNEL_LIMIT_TRIM,
-        SRV_CHANNEL_LIMIT_MIN,
-        SRV_CHANNEL_LIMIT_MAX,
-        SRV_CHANNEL_LIMIT_ZERO_PWM
+    enum class Limit {
+        TRIM,
+        MIN,
+        MAX,
+        ZERO_PWM
     };
 
     // set the output value as a pwm value
@@ -236,7 +240,7 @@ private:
     AP_Int16 servo_trim;
     // reversal, following convention that 1 means reversed, 0 means normal
     AP_Int8 reversed;
-    AP_Int8 function;
+    AP_Int16 function;
 
     // a pending output value as PWM
     uint16_t output_pwm;
@@ -269,7 +273,7 @@ private:
     void aux_servo_function_setup(void);
 
     // return PWM for a given limit value
-    uint16_t get_limit_pwm(LimitValue limit) const;
+    uint16_t get_limit_pwm(Limit limit) const;
 
     // get normalised output from -1 to 1
     float get_output_norm(void);
@@ -351,11 +355,6 @@ public:
     // save trims
     void save_trim(void);
 
-    // setup for a reversible k_throttle (from -100 to 100)
-    void set_reversible_throttle(void) {
-        flags.k_throttle_reversible = true;
-    }
-
     // setup IO failsafe for all channels to trim
     static void setup_failsafe_trim_all_non_motors(void);
 
@@ -390,13 +389,13 @@ public:
     static void set_failsafe_pwm(SRV_Channel::Aux_servo_function_t function, uint16_t pwm);
 
     // setup failsafe for an auxiliary channel function
-    static void set_failsafe_limit(SRV_Channel::Aux_servo_function_t function, SRV_Channel::LimitValue limit);
+    static void set_failsafe_limit(SRV_Channel::Aux_servo_function_t function, SRV_Channel::Limit limit);
 
     // setup safety for an auxiliary channel function (used when disarmed)
-    static void set_safety_limit(SRV_Channel::Aux_servo_function_t function, SRV_Channel::LimitValue limit);
+    static void set_safety_limit(SRV_Channel::Aux_servo_function_t function, SRV_Channel::Limit limit);
 
-    // set servo to a LimitValue
-    static void set_output_limit(SRV_Channel::Aux_servo_function_t function, SRV_Channel::LimitValue limit);
+    // set servo to a Limit
+    static void set_output_limit(SRV_Channel::Aux_servo_function_t function, SRV_Channel::Limit limit);
 
     // return true if a function is assigned to a channel
     static bool function_assigned(SRV_Channel::Aux_servo_function_t function);
@@ -450,9 +449,8 @@ public:
         return i<NUM_SERVO_CHANNELS?&channels[i]:nullptr;
     }
 
-    // upgrade RC* parameters into SERVO* parameters
-    static bool upgrade_parameters(const uint8_t old_keys[14], uint16_t aux_channel_mask, RCMapper *rcmap);
-    static void upgrade_motors_servo(uint8_t ap_motors_key, uint8_t ap_motors_idx, uint8_t new_channel);
+    // SERVO* parameters
+    static void upgrade_parameters(void);
 
     // given a zero-based motor channel, return the k_motor function for that channel
     static SRV_Channel::Aux_servo_function_t get_motor_function(uint8_t channel) {
@@ -493,9 +491,6 @@ public:
     }
 
 private:
-    struct {
-        bool k_throttle_reversible:1;
-    } flags;
 
     static bool disabled_passthrough;
 

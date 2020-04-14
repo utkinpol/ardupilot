@@ -8,7 +8,7 @@
 float Plane::get_speed_scaler(void)
 {
     float aspeed, speed_scaler;
-    if (ahrs.airspeed_estimate(&aspeed)) {
+    if (ahrs.airspeed_estimate(aspeed)) {
         if (aspeed > auto_state.highest_airspeed) {
             auto_state.highest_airspeed = aspeed;
         }
@@ -57,6 +57,7 @@ bool Plane::stick_mixing_enabled(void)
     if (auto_throttle_mode && auto_navigation_mode) {
         // we're in an auto mode. Check the stick mixing flag
         if (g.stick_mixing != STICK_MIXING_DISABLED &&
+            g.stick_mixing != STICK_MIXING_VTOL_YAW &&
             geofence_stickmixing() &&
             failsafe.state == FAILSAFE_NONE &&
             !rc_failsafe_active()) {

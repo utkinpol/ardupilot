@@ -52,22 +52,14 @@ class Board:
 
             env.DEFINES.update(
                 ENABLE_SCRIPTING = 1,
-                ENABLE_HEAP = 1,
                 LUA_32BITS = 1,
                 )
-
-            env.ROMFS_FILES += [
-                ('sandbox.lua', 'libraries/AP_Scripting/scripts/sandbox.lua'),
-                ]
 
             env.AP_LIBRARIES += [
                 'AP_Scripting',
                 'AP_Scripting/lua/src',
                 ]
 
-            env.CXXFLAGS += [
-                '-DHAL_HAVE_AP_ROMFS_EMBEDDED_H'
-                ]
         else:
             cfg.options.disable_scripting = True;
 
@@ -94,6 +86,11 @@ class Board:
             cfg.srcnode.find_dir('libraries/AP_Common/missing').abspath()
         ])
 
+    def cc_version_gte(self, cfg, want_major, want_minor):
+        (major, minor, patchlevel) = cfg.env.CC_VERSION
+        return (int(major) > want_major or
+                (int(major) == want_major and int(minor) >= want_minor))
+
     def configure_env(self, cfg, env):
         # Use a dictionary instead of the convetional list for definitions to
         # make easy to override them. Convert back to list before consumption.
@@ -115,7 +112,6 @@ class Board:
             '-Wno-redundant-decls',
             '-Wno-unknown-pragmas',
             '-Wno-trigraphs',
-            '-Wno-format-contains-nul',
             '-Werror=shadow',
             '-Werror=return-type',
             '-Werror=unused-result',
@@ -141,7 +137,16 @@ class Board:
                 '-Wno-inconsistent-missing-override',
                 '-Wno-mismatched-tags',
                 '-Wno-gnu-variable-sized-type-not-at-end',
+                '-Werror=implicit-fallthrough',
             ]
+        else:
+            env.CFLAGS += [
+                '-Wno-format-contains-nul',
+            ]
+            if self.cc_version_gte(cfg, 7, 4):
+                env.CXXFLAGS += [
+                    '-Werror=implicit-fallthrough',
+                ]
 
         if cfg.env.DEBUG:
             env.CFLAGS += [
@@ -152,6 +157,10 @@ class Board:
         if cfg.options.bootloader:
             # don't let bootloaders try and pull scripting in
             cfg.options.disable_scripting = True
+        else:
+            env.DEFINES.update(
+                ENABLE_HEAP = 1,
+            )
 
         if cfg.options.enable_math_check_indexes:
             env.CXXFLAGS += ['-DMATH_CHECK_INDEXES']
@@ -175,7 +184,6 @@ class Board:
             '-Wno-redundant-decls',
             '-Wno-unknown-pragmas',
             '-Wno-expansion-to-defined',
-            '-Wno-format-contains-nul',
             '-Werror=attributes',
             '-Werror=format-security',
             '-Werror=format-extra-args',
@@ -191,6 +199,7 @@ class Board:
             '-Werror=type-limits',
             '-Werror=unused-result',
             '-Werror=shadow',
+            '-Werror=unused-value',
             '-Werror=unused-variable',
             '-Werror=delete-non-virtual-dtor',
             '-Wfatal-errors',
@@ -224,15 +233,20 @@ class Board:
                 '-Wno-gnu-designator',
                 '-Wno-mismatched-tags',
                 '-Wno-gnu-variable-sized-type-not-at-end',
+                '-Werror=implicit-fallthrough',
             ]
         else:
             env.CXXFLAGS += [
+                '-Wno-format-contains-nul',
                 '-Werror=unused-but-set-variable'
             ]
-            (major, minor, patchlevel) = cfg.env.CC_VERSION
-            if int(major) > 5 or (int(major) == 5 and int(minor) > 1):
+            if self.cc_version_gte(cfg, 5, 2):
                 env.CXXFLAGS += [
                     '-Werror=suggest-override',
+                ]
+            if self.cc_version_gte(cfg, 7, 4):
+                env.CXXFLAGS += [
+                    '-Werror=implicit-fallthrough',
                 ]
 
         if cfg.env.DEBUG:
@@ -276,6 +290,11 @@ class Board:
         # We always want to use PRI format macros
         cfg.define('__STDC_FORMAT_MACROS', 1)
 
+        if cfg.options.disable_ekf2:
+            env.CXXFLAGS += ['-DHAL_NAVEKF2_AVAILABLE=0']
+
+        if cfg.options.disable_ekf3:
+            env.CXXFLAGS += ['-DHAL_NAVEKF3_AVAILABLE=0']
 
     def pre_build(self, bld):
         '''pre-build hook that gets called before dynamic sources'''
@@ -383,12 +402,21 @@ class sitl(Board):
             if not cfg.check_SFML(env):
                 cfg.fatal("Failed to find SFML libraries")
 
+        import fnmatch
         if cfg.options.sitl_osd:
-            env.CXXFLAGS += ['-DWITH_SITL_OSD','-DOSD_ENABLED=ENABLED','-DHAL_HAVE_AP_ROMFS_EMBEDDED_H']
-            import fnmatch
+            env.CXXFLAGS += ['-DWITH_SITL_OSD','-DOSD_ENABLED=1']
             for f in os.listdir('libraries/AP_OSD/fonts'):
                 if fnmatch.fnmatch(f, "font*bin"):
                     env.ROMFS_FILES += [(f,'libraries/AP_OSD/fonts/'+f)]
+
+        # embed any scripts from ROMFS/scripts
+        if os.path.exists('ROMFS/scripts'):
+            for f in os.listdir('ROMFS/scripts'):
+                if fnmatch.fnmatch(f, "*.lua"):
+                    env.ROMFS_FILES += [('scripts/'+f,'ROMFS/scripts/'+f)]
+
+        if len(env.ROMFS_FILES) > 0:
+            env.CXXFLAGS += ['-DHAL_HAVE_AP_ROMFS_EMBEDDED_H']
 
         if cfg.options.sitl_rgbled:
             env.CXXFLAGS += ['-DWITH_SITL_RGBLED']
@@ -428,6 +456,7 @@ class chibios(Board):
         env.DEFINES.update(
             CONFIG_HAL_BOARD = 'HAL_BOARD_CHIBIOS',
             HAVE_STD_NULLPTR_T = 0,
+            USE_LIBC_REALLOC = 0,
         )
 
         env.AP_LIBRARIES += [
@@ -479,6 +508,8 @@ class chibios(Board):
             '--specs=nano.specs',
             '-specs=nosys.specs',
             '-DCHIBIOS_BOARD_NAME="%s"' % self.name,
+            '-D__USE_CMSIS',
+            '-Werror=deprecated-declarations'
         ]
         env.CXXFLAGS += env.CFLAGS + [
             '-fno-rtti',
@@ -540,6 +571,10 @@ class chibios(Board):
             'ChibiOS',
         ]
 
+        env.INCLUDES += [
+            cfg.srcnode.find_dir('libraries/AP_GyroFFT/CMSIS_5/include').abspath()
+        ]
+
         try:
             import intelhex
             env.HAVE_INTEL_HEX = True
@@ -555,12 +590,12 @@ class chibios(Board):
 
     def pre_build(self, bld):
         '''pre-build hook that gets called before dynamic sources'''
-        super(chibios, self).pre_build(bld)
         from waflib.Context import load_tool
         module = load_tool('chibios', [], with_sys_path=True)
         fun = getattr(module, 'pre_build', None)
         if fun:
             fun(bld)
+        super(chibios, self).pre_build(bld)
 
 class linux(Board):
     def configure_env(self, cfg, env):
@@ -602,6 +637,16 @@ class linux(Board):
             waflib.Options.commands.append('rsync')
             # Avoid infinite recursion
             bld.options.upload = False
+
+class navigator(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
+    def configure_env(self, cfg, env):
+        super(navigator, self).configure_env(cfg, env)
+
+        env.DEFINES.update(
+            CONFIG_HAL_BOARD_SUBTYPE='HAL_BOARD_SUBTYPE_LINUX_NAVIGATOR',
+        )
 
 class erleboard(linux):
     toolchain = 'arm-linux-gnueabihf'

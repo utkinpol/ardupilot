@@ -430,9 +430,9 @@ void Plane::set_servos_controlled(void)
     
     if (!hal.util->get_soft_armed()) {
         if (arming.arming_required() == AP_Arming::Required::YES_ZERO_PWM) {
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::Limit::ZERO_PWM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::Limit::ZERO_PWM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::Limit::ZERO_PWM);
         } else {
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, 0);
@@ -470,16 +470,6 @@ void Plane::set_servos_controlled(void)
         SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 
             constrain_int16(quadplane.forward_throttle_pct(), min_throttle, max_throttle));
     }
-
-#if SOARING_ENABLED == ENABLED
-    // suppress throttle when soaring is active
-    if ((control_mode == &mode_fbwb || control_mode == &mode_cruise ||
-        control_mode == &mode_auto || control_mode == &mode_loiter) &&
-        g2.soaring_controller.is_active() &&
-        g2.soaring_controller.get_throttle_suppressed()) {
-        SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
-    }
-#endif
 }
 
 /*
@@ -492,7 +482,7 @@ void Plane::set_servos_flaps(void)
     int8_t manual_flap_percent = 0;
 
     // work out any manual flap input
-    RC_Channel *flapin = RC_Channels::rc_channel(g.flapin_channel-1);
+    RC_Channel *flapin = rc().find_channel_for_option(RC_Channel::AUX_FUNC::FLAP);
     if (flapin != nullptr && !failsafe.rc_failsafe && failsafe.throttle_counter == 0) {
         manual_flap_percent = flapin->percent_input();
     }
@@ -510,17 +500,12 @@ void Plane::set_servos_flaps(void)
             auto_flap_percent = g.flap_1_percent;
         } //else flaps stay at default zero deflection
 
-        if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && landing.get_flap_percent() != 0) {
-            auto_flap_percent = landing.get_flap_percent();
-        }
-
         /*
           special flap levels for takeoff and landing. This works
           better than speed based flaps as it leads to less
           possibility of oscillation
          */
-        if (control_mode == &mode_auto) {
-            switch (flight_stage) {
+        switch (flight_stage) {
             case AP_Vehicle::FixedWing::FLIGHT_TAKEOFF:
             case AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND:
                 if (g.takeoff_flap_percent != 0) {
@@ -533,9 +518,13 @@ void Plane::set_servos_flaps(void)
                     auto_flap_percent = g.takeoff_flap_percent;
                 }
                 break;
+            case AP_Vehicle::FixedWing::FLIGHT_LAND:
+                if (landing.get_flap_percent() != 0) {
+                  auto_flap_percent = landing.get_flap_percent();
+                }
+                break;
             default:
                 break;
-            }
         }
     }
 
@@ -646,8 +635,8 @@ void Plane::servos_twin_engine_mix(void)
     }
     if (!hal.util->get_soft_armed()) {
         if (arming.arming_required() == AP_Arming::Required::YES_ZERO_PWM) {
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::Limit::ZERO_PWM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::Limit::ZERO_PWM);
         } else {
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, 0);
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttleRight, 0);
@@ -799,9 +788,9 @@ void Plane::set_servos(void)
             SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, 0);
             SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, 0);
         } else if (landing.get_then_servos_neutral() == 2) {
-            SRV_Channels::set_output_limit(SRV_Channel::k_aileron, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_elevator, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_rudder, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_aileron, SRV_Channel::Limit::ZERO_PWM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_elevator, SRV_Channel::Limit::ZERO_PWM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_rudder, SRV_Channel::Limit::ZERO_PWM);
         }
     }
 
@@ -908,7 +897,7 @@ void Plane::servos_auto_trim(void)
     g2.servo_channels.adjust_trim(SRV_Channel::k_vtail_right, pitch_I);
 
     g2.servo_channels.adjust_trim(SRV_Channel::k_flaperon_left,  roll_I);
-    g2.servo_channels.adjust_trim(SRV_Channel::k_flaperon_right, -roll_I);
+    g2.servo_channels.adjust_trim(SRV_Channel::k_flaperon_right, roll_I);
 
     // cope with various dspoiler options
     const int8_t bitmask = g2.crow_flap_options.get();

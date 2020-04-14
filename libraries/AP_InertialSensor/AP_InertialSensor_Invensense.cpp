@@ -174,9 +174,7 @@ bool AP_InertialSensor_Invensense::_has_auxiliary_bus()
 
 void AP_InertialSensor_Invensense::start()
 {
-    if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        return;
-    }
+    _dev->get_semaphore()->take_blocking();
 
     // initially run the bus at low speed
     _dev->set_speed(AP_HAL::Device::SPEED_LOW);
@@ -428,7 +426,9 @@ bool AP_InertialSensor_Invensense::_accumulate(uint8_t *samples, uint8_t n_sampl
 
         int16_t t2 = int16_val(data, 3);
         if (!_check_raw_temp(t2)) {
-            debug("temp reset IMU[%u] %d %d", _accel_instance, _raw_temp, t2);
+            if (!hal.scheduler->in_expected_delay()) {
+                debug("temp reset IMU[%u] %d %d", _accel_instance, _raw_temp, t2);
+            }
             _fifo_reset();
             return false;
         }
@@ -471,7 +471,9 @@ bool AP_InertialSensor_Invensense::_accumulate_sensor_rate_sampling(uint8_t *sam
         // use temperatue to detect FIFO corruption
         int16_t t2 = int16_val(data, 3);
         if (!_check_raw_temp(t2)) {
-            debug("temp reset IMU[%u] %d %d", _accel_instance, _raw_temp, t2);
+            if (!hal.scheduler->in_expected_delay()) {
+                debug("temp reset IMU[%u] %d %d", _accel_instance, _raw_temp, t2);
+            }
             _fifo_reset();
             ret = false;
             break;
@@ -588,7 +590,9 @@ void AP_InertialSensor_Invensense::_read_fifo()
             }
             memset(rx, 0, n * MPU_SAMPLE_SIZE);
             if (!_dev->transfer(rx, n * MPU_SAMPLE_SIZE, rx, n * MPU_SAMPLE_SIZE)) {
-                hal.console->printf("MPU60x0: error in fifo read %u bytes\n", n * MPU_SAMPLE_SIZE);
+                if (!hal.scheduler->in_expected_delay()) {
+                    debug("MPU60x0: error in fifo read %u bytes\n", n * MPU_SAMPLE_SIZE);
+                }
                 _dev->set_chip_select(false);
                 goto check_registers;
             }
@@ -597,7 +601,9 @@ void AP_InertialSensor_Invensense::_read_fifo()
 
         if (_fast_sampling) {
             if (!_accumulate_sensor_rate_sampling(rx, n)) {
-                debug("IMU[%u] stop at %u of %u", _accel_instance, n_samples, bytes_read/MPU_SAMPLE_SIZE);
+                if (!hal.scheduler->in_expected_delay()) {
+                    debug("IMU[%u] stop at %u of %u", _accel_instance, n_samples, bytes_read/MPU_SAMPLE_SIZE);
+                }
                 break;
             }
         } else {
@@ -769,9 +775,7 @@ bool AP_InertialSensor_Invensense::_check_whoami(void)
 
 bool AP_InertialSensor_Invensense::_hardware_init(void)
 {
-    if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        return false;
-    }
+    _dev->get_semaphore()->take_blocking();
 
     // setup for register checking. We check much less often on I2C
     // where the cost of the checks is higher
@@ -985,10 +989,8 @@ void AP_Invensense_AuxiliaryBus::_configure_slaves()
         return;
     }
     
-    if (!backend._dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        return;
-    }
-    
+    backend._dev->get_semaphore()->take_blocking();
+
     /* Enable the I2C master to slaves on the auxiliary I2C bus*/
     if (!(backend._last_stat_user_ctrl & BIT_USER_CTRL_I2C_MST_EN)) {
         backend._last_stat_user_ctrl |= BIT_USER_CTRL_I2C_MST_EN;

@@ -35,6 +35,14 @@ void Copter::crash_check()
         return;
     }
 
+#if MODE_AUTOROTATE_ENABLED == ENABLED
+    //return immediately if in autorotation mode
+    if (control_mode == Mode::Number::AUTOROTATE) {
+        crash_counter = 0;
+        return;
+    }
+#endif
+
     // vehicle not crashed if 1hz filtered acceleration is more than 3m/s (1G on Z-axis has been subtracted)
     if (land_accel_ef_filter.get().length() >= CRASH_CHECK_ACCEL_MAX) {
         crash_counter = 0;
@@ -59,7 +67,7 @@ void Copter::crash_check()
         // send message to gcs
         gcs().send_text(MAV_SEVERITY_EMERGENCY,"Crash: Disarming");
         // disarm motors
-        copter.arming.disarm();
+        copter.arming.disarm(AP_Arming::Method::CRASH);
     }
 }
 
@@ -226,7 +234,7 @@ void Copter::parachute_check()
 void Copter::parachute_release()
 {
     // disarm motors
-    arming.disarm();
+    arming.disarm(AP_Arming::Method::PARACHUTE_RELEASE);
 
     // release parachute
     parachute.release();

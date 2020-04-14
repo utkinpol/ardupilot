@@ -321,13 +321,25 @@ void Scheduler::_timer_thread(void *arg)
         // process any pending RC output requests
         hal.rcout->timer_tick();
 
-        if (sched->expect_delay_start != 0) {
-            uint32_t now = AP_HAL::millis();
-            if (now - sched->expect_delay_start <= sched->expect_delay_length) {
-                sched->watchdog_pat();
-            }
+        if (sched->in_expected_delay()) {
+            sched->watchdog_pat();
         }
     }
+}
+
+/*
+  return true if we are in a period of expected delay. This can be
+  used to suppress error messages
+*/
+bool Scheduler::in_expected_delay(void) const
+{
+    if (expect_delay_start != 0) {
+        uint32_t now = AP_HAL::millis();
+        if (now - expect_delay_start <= expect_delay_length) {
+            return true;
+        }
+    }
+    return false;
 }
 
 #ifndef HAL_NO_MONITOR_THREAD
@@ -539,7 +551,7 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
   be used to prevent watchdog reset during expected long delays
   A value of zero cancels the previous expected delay
 */
-void Scheduler::expect_delay_ms(uint32_t ms)
+void Scheduler::_expect_delay_ms(uint32_t ms)
 {
     if (!in_main_thread()) {
         // only for main thread
@@ -548,6 +560,8 @@ void Scheduler::expect_delay_ms(uint32_t ms)
 
     // pat once immediately
     watchdog_pat();
+
+    WITH_SEMAPHORE(expect_delay_sem);
 
     if (ms == 0) {
         if (expect_delay_nesting > 0) {
@@ -572,6 +586,18 @@ void Scheduler::expect_delay_ms(uint32_t ms)
         // also put our priority below timer thread if we are boosted
         boost_end();
     }
+}
+
+/*
+  this is _expect_delay_ms() with check that we are in the main thread
+ */
+void Scheduler::expect_delay_ms(uint32_t ms)
+{
+    if (!in_main_thread()) {
+        // only for main thread
+        return;
+    }
+    _expect_delay_ms(ms);
 }
 
 // pat the watchdog

@@ -107,11 +107,17 @@ static const struct {
     { "quad",               MultiCopter::create },
     { "copter",             MultiCopter::create },
     { "x",                  MultiCopter::create },
+    { "bfxrev",             MultiCopter::create },
     { "bfx",                MultiCopter::create },
     { "djix",               MultiCopter::create },
     { "cwx",                MultiCopter::create },
     { "hexa",               MultiCopter::create },
+    { "hexa-cwx",           MultiCopter::create },
+    { "hexa-dji",           MultiCopter::create },
     { "octa",               MultiCopter::create },
+    { "octa-cwx",           MultiCopter::create },
+    { "octa-dji",           MultiCopter::create },
+    { "octa-quad-cwx",      MultiCopter::create },
     { "dodeca-hexa",        MultiCopter::create },
     { "tri",                MultiCopter::create },
     { "y6",                 MultiCopter::create },
@@ -371,7 +377,13 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     }
 
     if (!model_str) {
-        printf("You must specify a vehicle model\n");
+        printf("You must specify a vehicle model.  Options are:\n");
+        for (uint8_t i=0; i < ARRAY_SIZE(model_constructors); i++) {
+            printf("  %s\n", model_constructors[i].name);
+        }
+        // spit this out again as the original message probably just
+        // scrolled off the screen:
+        printf("You must specify a vehicle model.\n");
         exit(1);
     }
 
@@ -409,8 +421,8 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         if (_framerate == 0) {
             _framerate = 200;
         }
-    } else if (strcmp(SKETCH, "APMrover2") == 0) {
-        _vehicle = APMrover2;
+    } else if (strcmp(SKETCH, "Rover") == 0) {
+        _vehicle = Rover;
         if (_framerate == 0) {
             _framerate = 50;
         }

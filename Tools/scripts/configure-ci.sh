@@ -6,8 +6,8 @@ set -ex
 # Disable ccache for the configure phase, it's not worth it
 export CCACHE_DISABLE="true"
 
-ARM_ROOT="gcc-arm-none-eabi-4_9-2015q3"
-ARM_TARBALL="$ARM_ROOT-20150921-linux.tar.bz2"
+ARM_ROOT="gcc-arm-none-eabi-6-2017-q2-update"
+ARM_TARBALL="$ARM_ROOT-linux.tar.bz2"
 
 RPI_ROOT="master"
 RPI_TARBALL="$RPI_ROOT.tar.gz"
@@ -21,14 +21,14 @@ pushd $HOME
 # PX4 toolchain
 dir=$ARM_ROOT
 if [ ! -d "$HOME/opt/$dir" -o ! -x "$HOME/opt/$dir/bin/arm-none-eabi-g++" ]; then
-  wget http://firmware.ardupilot.org/Tools/STM32-tools/$ARM_TARBALL
+  wget https://firmware.ardupilot.org/Tools/STM32-tools/$ARM_TARBALL
   tar -xf $ARM_TARBALL -C opt
 fi
 
 # RPi/BBB toolchain
 dir="tools-master/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian-x64"
 if [ ! -d "$HOME/opt/$dir" -o ! -x "$HOME/opt/$dir/bin/arm-linux-gnueabihf-g++" ]; then
-  wget http://firmware.ardupilot.org/Tools/Travis/NavIO/$RPI_TARBALL
+  wget https://firmware.ardupilot.org/Tools/Travis/NavIO/$RPI_TARBALL
   tar -xf $RPI_TARBALL -C opt $dir
 fi
 
@@ -52,8 +52,6 @@ popd
 mkdir -p $HOME/bin
 
 # symlink to compiler versions
-ln -s /usr/bin/gcc-4.9 ~/bin/gcc
-ln -s /usr/bin/g++-4.9 ~/bin/g++
 ln -s /usr/bin/clang-7 ~/bin/clang
 ln -s /usr/bin/clang++-7 ~/bin/clang++
 ln -s /usr/bin/llvm-ar-7 ~/bin/llvm-ar
@@ -73,7 +71,7 @@ ln -s ~/opt/$CCACHE_ROOT/ccache ~/ccache/clang
 exportline="export PATH=$HOME/ccache"
 exportline="${exportline}:$HOME/bin"
 exportline="${exportline}:$HOME/.local/bin"
-exportline="${exportline}:$HOME/opt/gcc-arm-none-eabi-4_9-2015q3/bin"
+exportline="${exportline}:$HOME/opt/gcc-arm-none-eabi-6-2017-q2-update/bin"
 exportline="${exportline}:$HOME/opt/tools-master/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian-x64/bin"
 exportline="${exportline}:$HOME/opt/$CCACHE_ROOT"
 exportline="${exportline}:\$PATH"

@@ -5,6 +5,7 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_GPS/AP_GPS.h>
+#include <AP_VisualOdom/AP_VisualOdom.h>
 #include <new>
 
 /*
@@ -38,7 +39,7 @@
 #define CHECK_SCALER_DEFAULT    100
 #define FLOW_USE_DEFAULT        1
 
-#elif APM_BUILD_TYPE(APM_BUILD_APMrover2)
+#elif APM_BUILD_TYPE(APM_BUILD_Rover)
 // rover defaults
 #define VELNE_M_NSE_DEFAULT     0.5f
 #define VELD_M_NSE_DEFAULT      0.7f
@@ -585,11 +586,10 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     AP_GROUPEND
 };
 
-NavEKF2::NavEKF2(const AP_AHRS *ahrs, const RangeFinder &rng) :
-    _ahrs(ahrs),
-    _rng(rng)
+NavEKF2::NavEKF2()
 {
     AP_Param::setup_object_defaults(this, var_info);
+    _ahrs = &AP::ahrs();
 }
 
 /*
@@ -621,6 +621,11 @@ void NavEKF2::check_log_write(void)
 // Initialise the filter
 bool NavEKF2::InitialiseFilter(void)
 {
+    // Return immediately if there is insufficient memory
+    if (core_malloc_failed) {
+        return false;
+    }
+
     initFailure = InitFailures::UNKNOWN;
     if (_enable == 0) {
         if (_ahrs->get_ekf_type() == 2) {
@@ -666,16 +671,16 @@ bool NavEKF2::InitialiseFilter(void)
         // check if there is enough memory to create the EKF cores
         if (hal.util->available_memory() < sizeof(NavEKF2_core)*num_cores + 4096) {
             initFailure = InitFailures::NO_MEM;
+            core_malloc_failed = true;
             gcs().send_text(MAV_SEVERITY_CRITICAL, "NavEKF2: not enough memory available");
-            _enable.set(0);
             return false;
         }
 
         // try to allocate from CCM RAM, fallback to Normal RAM if not available or full
         core = (NavEKF2_core*)hal.util->malloc_type(sizeof(NavEKF2_core)*num_cores, AP_HAL::Util::MEM_FAST);
         if (core == nullptr) {
-            _enable.set(0);
             initFailure = InitFailures::NO_MEM;
+            core_malloc_failed = true;
             gcs().send_text(MAV_SEVERITY_CRITICAL, "NavEKF2: memory allocation failed");
             return false;
         }
@@ -1363,7 +1368,7 @@ void  NavEKF2::getFilterGpsStatus(int8_t instance, nav_gps_status &status) const
 }
 
 // send an EKF_STATUS_REPORT message to GCS
-void NavEKF2::send_status_report(mavlink_channel_t chan)
+void NavEKF2::send_status_report(mavlink_channel_t chan) const
 {
     if (core) {
         core[primary].send_status_report(chan);
@@ -1623,12 +1628,14 @@ void NavEKF2::getTimingStatistics(int8_t instance, struct ekf_timing &timing) co
  * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
  * resetTime_ms : system time of the last position reset request (mSec)
  *
+ * Sensor offsets are pulled directly from the AP_VisualOdom library
+ *
 */
-void NavEKF2::writeExtNavData(const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
+void NavEKF2::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms)
 {
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
-            core[i].writeExtNavData(sensOffset, pos, quat, posErr, angErr, timeStamp_ms, resetTime_ms);
+            core[i].writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, resetTime_ms);
         }
     }
 }
