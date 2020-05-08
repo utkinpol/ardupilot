@@ -104,38 +104,27 @@ void LoggerMessageWriter_DFLogStart::process()
             ap = AP_Param::next_scalar(&token, &type);
         }
 
-        stage = Stage::SYSINFO;
+        stage = Stage::RUNNING_SUBWRITERS;
         FALLTHROUGH;
 
-    case Stage::SYSINFO:
-        _writesysinfo.process();
-        if (AP::scheduler().time_available_usec() < MIN_LOOP_TIME_REMAINING_FOR_MESSAGE_WRITE_US) {
-            return;
-        }
+    case Stage::RUNNING_SUBWRITERS:
         if (!_writesysinfo.finished()) {
-            return;
-        }
-        stage = Stage::WRITE_ENTIRE_MISSION;
-        FALLTHROUGH;
-
-    case Stage::WRITE_ENTIRE_MISSION:
-        _writeentiremission.process();
-        if (AP::scheduler().time_available_usec() < MIN_LOOP_TIME_REMAINING_FOR_MESSAGE_WRITE_US) {
-            return;
+            _writesysinfo.process();
+            if (!_writesysinfo.finished()) {
+                return;
+            }
         }
         if (!_writeentiremission.finished()) {
-            return;
-        }
-        stage = Stage::WRITE_ALL_RALLY_POINTS;
-        FALLTHROUGH;
-
-    case Stage::WRITE_ALL_RALLY_POINTS:
-        _writeallrallypoints.process();
-        if (AP::scheduler().time_available_usec() < MIN_LOOP_TIME_REMAINING_FOR_MESSAGE_WRITE_US) {
-            return;
+            _writeentiremission.process();
+            if (!_writeentiremission.finished()) {
+                return;
+            }
         }
         if (!_writeallrallypoints.finished()) {
-            return;
+            _writeallrallypoints.process();
+            if (!_writeallrallypoints.finished()) {
+                return;
+            }
         }
         stage = Stage::VEHICLE_MESSAGES;
         FALLTHROUGH;
@@ -160,20 +149,38 @@ void LoggerMessageWriter_DFLogStart::process()
     _finished = true;
 }
 
+bool LoggerMessageWriter_DFLogStart::writeentiremission()
+{
+    if (stage != Stage::DONE) {
+        return false;
+    }
+    stage = Stage::RUNNING_SUBWRITERS;
+    _finished = false;
+    _writeentiremission.reset();
+    return true;
+}
+
+bool LoggerMessageWriter_DFLogStart::writeallrallypoints()
+{
+    if (stage != Stage::DONE) {
+        return false;
+    }
+    stage = Stage::RUNNING_SUBWRITERS;
+    _finished = false;
+    _writeallrallypoints.reset();
+    return true;
+}
+
 void LoggerMessageWriter_WriteSysInfo::reset()
 {
     LoggerMessageWriter::reset();
-    stage = Stage::FORMATS;
+    stage = Stage::FIRMWARE_STRING;
 }
 
 void LoggerMessageWriter_WriteSysInfo::process() {
     const AP_FWVersion &fwver = AP::fwversion();
 
     switch(stage) {
-
-    case Stage::FORMATS:
-        stage = Stage::FIRMWARE_STRING;
-        FALLTHROUGH;
 
     case Stage::FIRMWARE_STRING:
         if (! _logger_backend->Write_Message(fwver.fw_string)) {
@@ -250,6 +257,9 @@ void LoggerMessageWriter_WriteAllRallyPoints::process()
 
     case Stage::WRITE_ALL_RALLY_POINTS:
         while (_rally_number_to_send < _rally->get_rally_total()) {
+            if (AP::scheduler().time_available_usec() < MIN_LOOP_TIME_REMAINING_FOR_MESSAGE_WRITE_US) {
+                return;
+            }
             RallyLocation rallypoint;
             if (_rally->get_rally_point_with_index(_rally_number_to_send, rallypoint)) {
                 if (!_logger_backend->Write_RallyPoint(
@@ -297,6 +307,9 @@ void LoggerMessageWriter_WriteEntireMission::process() {
     case Stage::WRITE_MISSION_ITEMS: {
         AP_Mission::Mission_Command cmd;
         while (_mission_number_to_send < _mission->num_commands()) {
+            if (AP::scheduler().time_available_usec() < MIN_LOOP_TIME_REMAINING_FOR_MESSAGE_WRITE_US) {
+                return;
+            }
             // upon failure to write the mission we will re-read from
             // storage; this could be improved.
             if (_mission->read_cmd_from_storage(_mission_number_to_send,cmd)) {

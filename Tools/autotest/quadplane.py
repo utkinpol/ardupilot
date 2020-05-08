@@ -64,14 +64,7 @@ class AutoTestQuadPlane(AutoTest):
         pass
 
     def defaults_filepath(self):
-        vinfo = vehicleinfo.VehicleInfo()
-        defaults_filepath = vinfo.options["ArduPlane"]["frames"][self.frame]["default_params_filename"]
-        if isinstance(defaults_filepath, str):
-            defaults_filepath = [defaults_filepath]
-        defaults_list = []
-        for d in defaults_filepath:
-            defaults_list.append(os.path.join(testdir, d))
-        return ','.join(defaults_list)
+        return self.model_defaults_filepath("ArduPlane",self.frame)
 
     def is_plane(self):
         return True
@@ -256,8 +249,11 @@ class AutoTestQuadPlane(AutoTest):
         psd = self.mavfft_fttd(1, 0, tstart * 1.0e6, tend * 1.0e6)
 
         # batch sampler defaults give 1024 fft and sample rate of 1kz so roughly 1hz/bin
-        freq = psd["F"][numpy.argmax(psd["X"][minhz:maxhz]) + minhz] * (1000. / 1024.)
-        peakdb = numpy.amax(psd["X"][minhz:maxhz])
+        scale = 1000. / 1024.
+        sminhz = int(minhz * scale)
+        smaxhz = int(maxhz * scale)
+        freq = psd["F"][numpy.argmax(psd["X"][sminhz:smaxhz]) + sminhz]
+        peakdb = numpy.amax(psd["X"][sminhz:smaxhz])
         if peakdb < dblevel or (peakhz is not None and abs(freq - peakhz) / peakhz > 0.05):
             raise NotAchievedException("Did not detect a motor peak, found %fHz at %fdB" % (freq, peakdb))
         else:
@@ -269,6 +265,7 @@ class AutoTestQuadPlane(AutoTest):
         # accuracy is determined by sample rate and fft length, given our use of quinn we could probably use half of this
         freqDelta = 1000. / fftLength
         pkAvg = freq
+        freqs = []
 
         while True:
             m = mlog.recv_match(
@@ -277,8 +274,10 @@ class AutoTestQuadPlane(AutoTest):
                 condition="FTN1.TimeUS>%u and FTN1.TimeUS<%u" % (tstart * 1.0e6, tend * 1.0e6))
             if m is None:
                 break
-            pkAvg = pkAvg + (0.1 * (m.PkAvg - pkAvg))
+            freqs.append(m.PkAvg)
+
         # peak within resolution of FFT length
+        pkAvg = numpy.median(numpy.asarray(freqs))
         if abs(pkAvg - freq) > freqDelta:
             raise NotAchievedException("FFT did not detect a motor peak at %f, found %f, wanted %f" % (dblevel, pkAvg, freq))
 
@@ -357,7 +356,7 @@ class AutoTestQuadPlane(AutoTest):
             self.do_RTL()
             psd = self.mavfft_fttd(1, 0, tstart * 1.0e6, tend * 1.0e6)
             freq = psd["F"][numpy.argmax(psd["X"][ignore_bins:]) + ignore_bins]
-            if numpy.amax(psd["X"][ignore_bins:]) < -15:
+            if numpy.amax(psd["X"][ignore_bins:]) < -10:
                 self.progress("Did not detect a motor peak, found %f at %f dB" % (freq, numpy.amax(psd["X"][ignore_bins:])))
             else:
                 raise NotAchievedException("Detected motor peak at %f Hz" % (freq))
