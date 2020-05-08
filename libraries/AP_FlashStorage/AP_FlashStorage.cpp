@@ -142,7 +142,7 @@ bool AP_FlashStorage::switch_full_sector(void)
     debug("running switch_full_sector()\n");
 
     if (in_switch_full_sector) {
-        AP::internalerror().error(AP_InternalError::error_t::switch_full_sector_recursion);
+        INTERNAL_ERROR(AP_InternalError::error_t::switch_full_sector_recursion);
         return false;
     }
     in_switch_full_sector = true;
@@ -476,7 +476,7 @@ AP_FlashStorage::SectorState AP_FlashStorage::sector_header::get_state(void) con
     if (state1 == 0xFFFFFFF1 &&
         state2 == 0xFFFFFFFF &&
         state3 == 0xFFFFFFFF &&
-        signature  == signature &&
+        signature1 == signature &&
         signature2 == 0xFFFFFFFF &&
         signature3 == 0xFFFFFFFF) {
         return SECTOR_STATE_AVAILABLE;
@@ -484,7 +484,7 @@ AP_FlashStorage::SectorState AP_FlashStorage::sector_header::get_state(void) con
     if (state1 == 0xFFFFFFF1 &&
         state2 == 0xFFFFFFF2 &&
         state3 == 0xFFFFFFFF &&
-        signature  == signature &&
+        signature1 == signature &&
         signature2 == signature &&
         signature3 == 0xFFFFFFFF) {
         return SECTOR_STATE_IN_USE;
@@ -492,7 +492,7 @@ AP_FlashStorage::SectorState AP_FlashStorage::sector_header::get_state(void) con
     if (state1 == 0xFFFFFFF1 &&
         state2 == 0xFFFFFFF2 &&
         state3 == 0xFFFFFFF3 &&
-        signature  == signature &&
+        signature1 == signature &&
         signature2 == signature &&
         signature3 == signature) {
         return SECTOR_STATE_FULL;

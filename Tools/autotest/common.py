@@ -706,7 +706,12 @@ class AutoTest(ABC):
                  disable_breakpoints=False,
                  viewerip=None,
                  use_map=False,
-                 _show_test_timings=False):
+                 _show_test_timings=False,
+                 force_ahrs_type=None):
+
+        self.start_time = time.time()
+        global __autotest__ # FIXME; make progress a non-staticmethod
+        __autotest__ = self
 
         if binary is None:
             raise ValueError("Should always have a binary")
@@ -740,11 +745,16 @@ class AutoTest(ABC):
         self.test_timings = dict()
         self.total_waiting_to_arm_time = 0
         self.waiting_to_arm_count = 0
+        self.force_ahrs_type = force_ahrs_type
+        if self.force_ahrs_type is not None:
+            self.force_ahrs_type = int(self.force_ahrs_type)
 
     @staticmethod
     def progress(text):
         """Display autotest progress text."""
-        print("AUTOTEST: " + text)
+        global __autotest__
+        delta_time = time.time() - __autotest__.start_time
+        print("AT-%06.1f: %s" % (delta_time,text))
 
     # following two functions swiped from autotest.py:
     @staticmethod
@@ -848,6 +858,12 @@ class AutoTest(ABC):
             self.repeatedly_apply_parameter_file(os.path.join(testdir, x))
         self.set_parameter('LOG_REPLAY', 1)
         self.set_parameter('LOG_DISARMED', 1)
+        if self.force_ahrs_type is not None:
+            if self.force_ahrs_type == 2:
+                self.set_parameter("EK2_ENABLE", 1)
+            if self.force_ahrs_type == 3:
+                self.set_parameter("EK3_ENABLE", 1)
+            self.set_parameter("AHRS_EKF_TYPE", self.force_ahrs_type)
         self.reboot_sitl()
         self.fetch_parameters()
 
@@ -1011,7 +1027,7 @@ class AutoTest(ABC):
         vehicle = self.log_name()
         if vehicle == "HeliCopter":
             vehicle = "ArduCopter"
-        if vehicle == "QuadPlane" or vehicle =="Soaring":
+        if vehicle == "QuadPlane":
             vehicle = "ArduPlane"
         cmd = [param_parse_filepath, '--vehicle', vehicle]
 #        cmd.append("--verbose")
@@ -1074,8 +1090,6 @@ class AutoTest(ABC):
             dirname = "ArduPlane"
         elif dirname == "HeliCopter":
             dirname = "ArduCopter"
-        elif dirname == "Soaring":
-            dirname = "ArduPlane"
         return os.path.join(self.rootdir(), dirname)
 
     def all_log_format_ids(self):
@@ -1228,16 +1242,22 @@ class AutoTest(ABC):
                     if not re.search("[.]cpp$", f):
                         continue
                     filepath = os.path.join(root, f)
+                    if "AP_Logger/examples" in filepath:
+                        # this is the sample file which contains examples...
+                        continue
                     count = 0
                     for line in open(filepath,'rb').readlines():
                         if type(line) == bytes:
                             line = line.decode("utf-8")
                         if state == state_outside:
-                            if re.match("\s*AP::logger\(\)[.]Write\(", line):
+                            if (re.match("\s*AP::logger\(\)[.]Write\(", line) or
+                                re.match("\s*logger[.]Write\(", line)):
                                 state = state_inside
+                                line = re.sub("//.*", "", line) # trim comments
                                 log_write_statement = line
                             continue
                         if state == state_inside:
+                            line = re.sub("//.*", "", line) # trim comments
                             log_write_statement += line
                             if re.match(".*\);", line):
                                 log_write_statements.append(log_write_statement)
@@ -1253,8 +1273,13 @@ class AutoTest(ABC):
         for log_write_statement in log_write_statements:
             for define in defines:
                 log_write_statement = re.sub(define, defines[define], log_write_statement)
-            my_re = ' AP::logger\(\)[.]Write\(\s*"(\w+)"\s*,\s*"([\w,]+)".*\);'
+            # fair warning: order is important here because of the
+            # NKT/XKT special case below....
+            my_re = ' logger[.]Write\(\s*"(\w+)"\s*,\s*"([\w,]+)".*\);'
             m = re.match(my_re, log_write_statement)
+            if m is None:
+                my_re = ' AP::logger\(\)[.]Write\(\s*"(\w+)"\s*,\s*"([\w,]+)".*\);'
+                m = re.match(my_re, log_write_statement)
             if m is None:
                 if "TimeUS,C,Cnt,IMUMin,IMUMax,EKFMin" in log_write_statement:
                     # special-case for logging ekf timing:
@@ -1265,7 +1290,7 @@ class AutoTest(ABC):
                             raise NotAchievedException("Did not match (%s)", x)
                         results.append((m.group(1), m.group(2)))
                     continue
-                raise NotAchievedException("Did not match (%s)" % (log_write_statement))
+                raise NotAchievedException("Did not match (%s) with (%s)" % (log_write_statement, str(my_re)))
             else:
                 results.append((m.group(1), m.group(2)))
 
@@ -1298,7 +1323,6 @@ class AutoTest(ABC):
             "HeliCopter": "Copter",
             "ArduPlane": "Plane",
             "QuadPlane": "Plane",
-            "Soaring": "Plane",
             "Rover": "Rover",
             "AntennaTracker": "Tracker",
             "ArduSub": "Sub",
@@ -1337,12 +1361,12 @@ class AutoTest(ABC):
                 docco_ids[name]["labels"].append(fieldname)
 
         code_ids = self.all_log_format_ids()
-        print("Code ids: (%s)" % str(code_ids.keys()))
-        print("Docco ids: (%s)" % str(docco_ids.keys()))
+        print("Code ids: (%s)" % str(sorted(code_ids.keys())))
+        print("Docco ids: (%s)" % str(sorted(docco_ids.keys())))
 
         for name in sorted(code_ids.keys()):
             if name not in docco_ids:
-                self.progress("Undocumented message: %s" % name)
+                self.progress("Undocumented message: %s" % str(name))
                 continue
             seen_labels = {}
             for label in code_ids[name]["labels"].split(","):
@@ -1613,11 +1637,26 @@ class AutoTest(ABC):
         this_dir = os.path.dirname(__file__)
         return os.path.realpath(os.path.join(this_dir, "../.."))
 
-    def assert_mission_files_same(self, file1, file2):
+    def assert_mission_files_same(self, file1, file2, match_comments=False):
         self.progress("Comparing (%s) and (%s)" % (file1, file2, ))
+
         f1 = open(file1)
         f2 = open(file2)
-        for l1, l2 in zip(f1, f2):
+        lines1 = f1.readlines()
+        lines2 = f2.readlines()
+
+        if not match_comments:
+            # strip comments from all lines
+            lines1 = [re.sub(r"\s*#.*", "", x, re.DOTALL) for x in lines1]
+            lines2 = [re.sub(r"\s*#.*", "", x, re.DOTALL) for x in lines2]
+            # FIXME: because DOTALL doesn't seem to work as expected:
+            lines1 = [x.rstrip() for x in lines1]
+            lines2 = [x.rstrip() for x in lines2]
+            # remove now-empty lines:
+            lines1 = filter(lambda x : len(x), lines1)
+            lines2 = filter(lambda x : len(x), lines2)
+
+        for l1, l2 in zip(lines1, lines2):
             l1 = l1.rstrip("\r\n")
             l2 = l2.rstrip("\r\n")
             if l1 == l2:
@@ -1640,11 +1679,12 @@ class AutoTest(ABC):
                              mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME,
                              mavutil.mavlink.MAV_CMD_DO_JUMP,
                              mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL,
+                             mavutil.mavlink.MAV_CMD_DO_SET_SERVO,
                              ]:
                         # ardupilot doesn't remember frame on these commands
-                        if int(i1) == 3:
+                        if int(i1) in [3, 10]: # 3 is relative, 10 is AMSL
                             i1 = 0
-                        if int(i2) == 3:
+                        if int(i2) in [3, 10]:
                             i2 = 0
                 if count == 6: # param 3
                     if t in [mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME]:
@@ -5131,15 +5171,29 @@ switch value'''
         self.wait_ready_to_arm()
 
         # test we get statustext strings.  This relies on ArduPilot
-        # emitting statustext strings when we fetch parameters.
-        self.mavproxy.send("param fetch\n")
+        # emitting statustext strings when we fetch parameters. (or,
+        # now, an updating-barometer statustext)
         tstart = self.get_sim_time_cached()
         old_data = None
         text = ""
+        sent_request = False
         while True:
             now = self.get_sim_time()
             if now - tstart > 60: # it can take a *long* time to get these messages down!
                 raise NotAchievedException("Did not get statustext in time")
+            if now - tstart > 30 and not sent_request:
+                # have to wait this long or our message gets squelched....
+                sent_request = True
+#                                self.mavproxy.send("param fetch\n")
+                self.run_cmd(mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION,
+                             0, #p1
+                             0, #p2
+                             1, #p3, baro
+                             0, #p4
+                             0, #p5
+                             0, #p6
+                             0, #p7
+                )
             frsky.update()
             data = frsky.get_data(0x5000) # no timestamping on this data, so we can't catch legitimate repeats.
             if data is None:
@@ -5161,7 +5215,9 @@ switch value'''
                 if (x & 0x7f) == 0x00:
                     last = True
             if last:
-                m = re.match("Ardu(Plane|Copter|Rover|Tracker|Sub) V[345]", text)
+                # we used to do a 'param fetch' and expect this back, but the params-via-ftp thing broke it.
+#                m = re.match("Ardu(Plane|Copter|Rover|Tracker|Sub) V[345]", text)
+                m = re.match("Updating barometer calibration", text)
                 if m is not None:
                     want_sev = mavutil.mavlink.MAV_SEVERITY_INFO
                     if severity != want_sev:
@@ -5538,3 +5594,14 @@ switch value'''
         psd["F"] = freqmap
 
         return psd
+
+    def model_defaults_filepath(self, vehicle, model):
+
+        vinfo = vehicleinfo.VehicleInfo()
+        defaults_filepath = vinfo.options[vehicle]["frames"][model]["default_params_filename"]
+        if isinstance(defaults_filepath, str):
+            defaults_filepath = [defaults_filepath]
+        defaults_list = []
+        for d in defaults_filepath:
+            defaults_list.append(os.path.join(testdir, d))
+        return ','.join(defaults_list)
